@@ -1,0 +1,27 @@
+# Secrets / credentials — never commit
+.env
+*.pem
+*.key
+*.p12
+*.pfx
+service-account*.json
+*-sa-key.json
+
+# Swift / SwiftPM
+.build/
+.swiftpm/
+Package.resolved
+
+# Xcode
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+*.moved-aside
+xcuserdata/
+
+# macOS
+.DS_Store
+
+# TechDocs build output
+site/

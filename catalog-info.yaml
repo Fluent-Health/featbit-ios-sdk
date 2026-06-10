@@ -1,0 +1,25 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: featbit-ios-sdk
+  description: FeatBit client-side feature-flag SDK for Swift/iOS (based on FeatBit's .NET + React Native client SDKs)
+  annotations:
+    github.com/project-slug: Fluent-Health/featbit-ios-sdk
+    backstage.io/techdocs-ref: dir:.
+    # OSS lifecycle tracking: set to "published" once the repository is made public.
+    fluentinhealth.com/oss: pending
+    fluentinhealth.com/service-assessment: |-
+      security:
+        - type: auth
+          value: none
+          details:
+            - type: exception
+              title: Client-side SDK — no server endpoints or auth surface of its own
+        - type: permissions
+          value: unspecified
+        - type: security
+          value: none
+spec:
+  type: library
+  lifecycle: experimental
+  owner: group:default/engineering
