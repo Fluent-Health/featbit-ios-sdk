@@ -17,6 +17,19 @@ sync.
 - **Your job:** open the package on a Mac, run `swift test`, build the example app, run the E2E
   suite against Docker, and resolve any platform-specific gaps (expected to be small).
 
+## For an AI agent (Claude Code) picking this up
+
+1. Read [`CLAUDE.md`](./CLAUDE.md) (guardrails + run/verify loop) and this file.
+2. Orient with `swift build` then `swift test` — expect `0 failures` (3 E2E tests skip without
+   `FEATBIT_E2E`). That confirms your toolchain matches the Linux baseline.
+3. Work the **macOS-only TODO checklist** below top-to-bottom; each item lists its acceptance
+   criterion. Mark a task done only when its stated command is green and you can quote it.
+4. **Don't fabricate runtime verification.** Live streaming/polling needs a real FeatBit env secret
+   + evaluation URL, and E2E needs Docker. If you lack those, complete the compile/test items, and
+   clearly report which runtime items remain unverified rather than guessing.
+5. Stay within the guardrails in `CLAUDE.md` — wire compatibility, platform `#if` guards, Apache-2.0,
+   and **do not make the repo public**.
+
 ## Status matrix
 
 | Component | Status |
@@ -62,21 +75,31 @@ xcodebuild -project Examples/FeatBitExampleApp/FeatBitExampleApp.xcodeproj \
 
 ## macOS-only TODO checklist
 
-- [ ] `swift build` + `swift test` on macOS — confirm the `#if canImport` Apple paths compile
-      (`FeatBitSwiftUI`, `FeatBitLifecycle`, the Combine `flagChanges`).
-- [ ] **Streaming runtime:** exercise `StreamingDataSynchronizer` on a device/simulator against a
-      real FeatBit env. Confirm connect → `data-sync` → flag updates, the 20s heartbeat, and
-      exponential-backoff reconnect.
-- [ ] **Lifecycle:** confirm `FBLifecycleConnector` drops the socket on background and resyncs on
-      foreground; confirm `NWPathMonitor` toggles `setNetworkAvailable`.
-- [ ] **SwiftUI:** confirm `FeatBit` re-renders views on flag change; confirm
-      `.featBitScenePhase(_:)`.
-- [ ] **Example app:** create `FeatBitExampleApp.xcodeproj` (see its README), run on a simulator,
-      toggle a flag in FeatBit and watch it update live.
-- [ ] **E2E:** run `FEATBIT_E2E=1 swift test --filter E2E` with Docker. Decide CI placement (see
-      Risks); GitHub `macos-*` runners lack Docker, so streaming E2E may need `colima` on macOS or
-      stays a local/manual check while CI keeps unit-level streaming coverage.
-- [ ] Once green on macOS, tag an initial version (e.g. `0.1.0`) so SPM `from:` resolves.
+Each item names its **acceptance criterion** (AC). Mark done only when the AC is met.
+
+- [ ] **Compile + test on macOS.** `swift build` then `swift test`.
+      *AC:* both succeed with `0 failures`; the SwiftUI/UIKit/streaming/Combine targets compile (they
+      only build under `#if canImport(Darwin/…)`). *(Already green on CI `macos-14`.)*
+- [ ] **Streaming runtime:** exercise `StreamingDataSynchronizer` on a simulator/device against a
+      real FeatBit env (needs an env secret + eval URL).
+      *AC:* `client.start()` returns `true` in streaming mode; toggling a flag server-side pushes a
+      change within seconds; the 20s heartbeat and backoff-reconnect behave (watch logs).
+- [ ] **Lifecycle:** with `FBLifecycleConnector` started, background the app and foreground it.
+      *AC:* socket drops after `backgroundGracePeriod` on background and reconnects+resyncs on
+      foreground; `NWPathMonitor` toggling flips `setNetworkAvailable`.
+- [ ] **SwiftUI:** a view reading `featBit.bool(...)` re-renders when the flag changes.
+      *AC:* live UI update without manual refresh; `.featBitScenePhase(_:)` drives foreground.
+- [ ] **Example app:** create `FeatBitExampleApp.xcodeproj` (see `Examples/FeatBitExampleApp/README.md`).
+      *AC:* `xcodebuild -project … -scheme FeatBitExampleApp -destination 'generic/platform=iOS' build`
+      succeeds; running it on a simulator shows the flag value updating live. Then the CI `macos` job's
+      example-app step (currently skipped when the project is absent) actually builds it.
+- [ ] **E2E:** `FEATBIT_E2E=1 swift test --filter E2E` with Docker.
+      *AC:* polling + streaming E2E pass. Then flip the `e2e` CI job from `continue-on-error: true` to
+      blocking (`.github/workflows/ci.yml`). Note: GitHub `macos-*` runners lack Docker — if you want
+      streaming E2E in CI, provision Docker on macOS via `colima`, else keep streaming E2E as a
+      local/manual check and let CI run polling E2E on `ubuntu-latest`.
+- [ ] **Tag a version.** Once green on macOS, tag `0.1.0` so SPM `from:` resolves.
+      *AC:* `git tag 0.1.0 && git push --tags` and a consumer can `.package(url:…, from: "0.1.0")`.
 
 ## Known risks / spikes
 
@@ -94,8 +117,10 @@ xcodebuild -project Examples/FeatBitExampleApp/FeatBitExampleApp.xcodeproj \
 
 ## Wire-protocol contract (do not break)
 
-The SDK must stay byte-compatible with the FeatBit server **and** the Android SDK. The source of
-truth is the "Wire protocol" section of the implementation plan and the Android repo. Key points:
+The SDK must stay byte-compatible with the FeatBit server **and** the Android SDK. The sources of
+truth are the contract below, the SDK source itself (`Sources/FeatBitClient/Internal/` and
+`DataSynchronizer/`), and the [Android repo](https://github.com/Fluent-Health/featbit-android-sdk)
+(compare behavior there when unsure). Key points:
 
 - **Connection token** (`ConnectionToken.swift`): the digit→char obfuscation + header/splice scheme.
   `ConnectionTokenTests` pins exact outputs — if those change, you've broken compatibility.
