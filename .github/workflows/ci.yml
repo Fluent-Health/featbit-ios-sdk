@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Build & unit test (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.0"
+      - name: Build
+        run: swift build
+      - name: Unit tests
+        run: swift test
+
+  macos:
+    name: Build & test + example app (macOS)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+      - name: Build
+        run: swift build
+      - name: Test (incl. SwiftUI / streaming targets)
+        run: swift test
+      - name: Build example app
+        run: |
+          xcodebuild \
+            -project Examples/FeatBitExampleApp/FeatBitExampleApp.xcodeproj \
+            -scheme FeatBitExampleApp \
+            -destination 'generic/platform=iOS' \
+            build
+
+  e2e:
+    name: End-to-end (Docker)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.0"
+      - name: Full-stack E2E against a real FeatBit stack
+        env:
+          FEATBIT_E2E: "1"
+        run: swift test --filter E2E
