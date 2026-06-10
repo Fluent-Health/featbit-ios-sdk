@@ -1,0 +1,12 @@
+site_name: FeatBit Swift/iOS SDK
+site_description: FeatBit client-side feature-flag SDK for Swift/iOS
+repo_url: https://github.com/Fluent-Health/featbit-ios-sdk
+edit_uri: edit/main/docs/
+
+nav:
+  - Home: index.md
+  - Usage: usage.md
+  - Data synchronization: data-sync.md
+
+plugins:
+  - techdocs-core
