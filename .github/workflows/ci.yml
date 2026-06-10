@@ -50,6 +50,10 @@ jobs:
   e2e:
     name: End-to-end (Docker)
     runs-on: ubuntu-latest
+    # Provisional: the Docker-backed full-stack E2E has not yet been validated end-to-end (see
+    # HANDOVER.md). Non-blocking until an iOS dev confirms it on a Docker host; streaming E2E is
+    # additionally Apple-only and skips here. Flip to blocking once validated.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: swift-actions/setup-swift@v2

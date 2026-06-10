@@ -17,6 +17,10 @@ final class FeatBitStreamingE2ETests: XCTestCase {
     override class func setUp() {
         super.setUp()
         guard enabled else { return }
+        #if !canImport(Darwin)
+        // Streaming relies on URLSessionWebSocketTask (Apple-only); don't even stand up the stack.
+        return
+        #else
         let s = FeatBitStack()
         do {
             try s.start()
@@ -25,6 +29,7 @@ final class FeatBitStreamingE2ETests: XCTestCase {
         } catch {
             XCTFail("E2E stack failed to start: \(error)")
         }
+        #endif
     }
 
     override class func tearDown() {
@@ -36,6 +41,9 @@ final class FeatBitStreamingE2ETests: XCTestCase {
 
     override func setUpWithError() throws {
         try XCTSkipUnless(Self.enabled, "Set FEATBIT_E2E=1 (and have Docker) to run E2E tests")
+        #if !canImport(Darwin)
+        throw XCTSkip("Streaming requires URLSessionWebSocketTask (Apple platforms); skipped here.")
+        #endif
     }
 
     func testStreamsSeededFlagAndReceivesServerSideChange() async throws {
