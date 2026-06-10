@@ -4,6 +4,12 @@ import Foundation
 import FoundationNetworking
 #endif
 
+// The WebSocket runtime relies on `URLSessionWebSocketTask`, whose `send`/`receive` completion-handler
+// API is unavailable on some Linux Foundation builds. Compile the real implementation only on Apple
+// platforms (where it is verified); provide a stub elsewhere so the package builds everywhere. See
+// HANDOVER.md.
+#if canImport(Darwin)
+
 /// Synchronizes feature flags in real time over a WebSocket to FeatBit's `/streaming` endpoint.
 ///
 /// On connect it sends a `data-sync` message (with the current user and last-seen timestamp); the
@@ -11,9 +17,6 @@ import FoundationNetworking
 /// changes. Flags are upserted into the shared store, driving evaluation and the flag tracker
 /// exactly as in polling mode. An application-level `ping` heartbeat plus exponential-backoff
 /// reconnection keep the connection healthy. Port of the Kotlin `StreamingDataSynchronizer`.
-///
-/// > Note: The WebSocket runtime relies on `URLSessionWebSocketTask`, which is incomplete on some
-/// > Linux Foundation builds; it is verified on Apple platforms (see HANDOVER.md).
 final class StreamingDataSynchronizer: NSObject, DataSynchronizer, @unchecked Sendable {
     private let logger: FBLogger
     private let secret: String
@@ -318,3 +321,28 @@ private enum JSONValue: Codable {
         }
     }
 }
+
+#else
+
+/// Streaming is unsupported on non-Apple platforms because `URLSessionWebSocketTask`'s
+/// completion-handler API is incomplete in Linux Foundation. The stub keeps the package building;
+/// `start()` reports failure so callers fall back / surface the misconfiguration. Streaming is
+/// verified on Apple platforms (see HANDOVER.md).
+final class StreamingDataSynchronizer: DataSynchronizer, @unchecked Sendable {
+    private let logger: FBLogger
+
+    init(options: FBOptions, user: FBUser, store: MemoryStore) {
+        self.logger = options.logger
+    }
+
+    let initialized = false
+
+    func start() async -> Bool {
+        logger.error("Streaming sync is not supported on this platform (URLSessionWebSocketTask is unavailable). Use polling instead.", nil)
+        return false
+    }
+
+    func close() {}
+}
+
+#endif

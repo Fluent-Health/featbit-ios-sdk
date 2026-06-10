@@ -82,7 +82,7 @@ final class ChangeRecorder: @unchecked Sendable {
 
 extension XCTestCase {
     /// Polls `predicate` until it is true or `timeout` elapses.
-    func awaitUntil(timeout: TimeInterval, _ predicate: () -> Bool) async -> Bool {
+    func awaitUntil(timeout: TimeInterval, _ predicate: @escaping () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if predicate() { return true }
