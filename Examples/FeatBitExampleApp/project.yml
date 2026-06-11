@@ -1,6 +1,10 @@
 name: FeatBitExampleApp
 options:
   bundleIdPrefix: com.fluentinhealth
+  # Keep the generated project readable by Xcode 15.4 (the SDK's minimum / CI's macos-14 runner):
+  # after regenerating, set `objectVersion = 56` in project.pbxproj (newer XcodeGen emits 77,
+  # which Xcode 15 cannot parse).
+  xcodeVersion: "15.4"
   deploymentTarget:
     iOS: "14.0"
 packages:
