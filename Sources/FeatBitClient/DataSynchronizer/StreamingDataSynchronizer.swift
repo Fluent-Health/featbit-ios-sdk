@@ -6,8 +6,7 @@ import FoundationNetworking
 
 // The WebSocket runtime relies on `URLSessionWebSocketTask`, whose `send`/`receive` completion-handler
 // API is unavailable on some Linux Foundation builds. Compile the real implementation only on Apple
-// platforms (where it is verified); provide a stub elsewhere so the package builds everywhere. See
-// HANDOVER.md.
+// platforms; provide a stub elsewhere so the package builds everywhere.
 #if canImport(Darwin)
 
 /// Synchronizes feature flags in real time over a WebSocket to FeatBit's `/streaming` endpoint.
@@ -326,8 +325,7 @@ private enum JSONValue: Codable {
 
 /// Streaming is unsupported on non-Apple platforms because `URLSessionWebSocketTask`'s
 /// completion-handler API is incomplete in Linux Foundation. The stub keeps the package building;
-/// `start()` reports failure so callers fall back / surface the misconfiguration. Streaming is
-/// verified on Apple platforms (see HANDOVER.md).
+/// `start()` reports failure so callers fall back / surface the misconfiguration.
 final class StreamingDataSynchronizer: DataSynchronizer, @unchecked Sendable {
     private let logger: FBLogger
 

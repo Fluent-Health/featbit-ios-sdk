@@ -8,7 +8,7 @@ import XCTest
 /// foreground reconnects + resyncs.
 ///
 /// Gated by `FEATBIT_E2E=1` (requires Docker), like ``FeatBitE2ETests``. Streaming additionally
-/// requires a working `URLSessionWebSocketTask` (see HANDOVER.md) — verified on Apple platforms.
+/// requires a working `URLSessionWebSocketTask`, so these tests run on Apple platforms only.
 final class FeatBitStreamingE2ETests: XCTestCase {
     private static let enabled = ProcessInfo.processInfo.environment["FEATBIT_E2E"] == "1"
     private static var stack: FeatBitStack?
