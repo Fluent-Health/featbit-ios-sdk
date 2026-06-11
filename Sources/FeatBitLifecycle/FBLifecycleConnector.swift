@@ -20,13 +20,21 @@ import FeatBitClient
 /// ```
 public final class FBLifecycleConnector {
     private let client: FBClient
+    private let backgroundGracePeriod: TimeInterval
     private let monitor = NWPathMonitor()
     private let monitorQueue = DispatchQueue(label: "co.featbit.lifecycle.network")
     private var observers: [NSObjectProtocol] = []
     private var started = false
+    private var backgroundHold: UIBackgroundTaskIdentifier = .invalid
 
-    public init(client: FBClient) {
+    /// How long past the grace period the background hold lasts, covering pause + socket teardown.
+    private static let holdBuffer: TimeInterval = 5
+
+    /// - Parameter backgroundGracePeriod: must match `FBOptions.backgroundGracePeriod` so the
+    ///   process is kept alive exactly long enough for the client's grace timer to pause streaming.
+    public init(client: FBClient, backgroundGracePeriod: TimeInterval = FBOptions.Defaults.backgroundGracePeriod) {
         self.client = client
+        self.backgroundGracePeriod = backgroundGracePeriod
     }
 
     /// Registers lifecycle + network observers. Call on the main thread.
@@ -35,11 +43,18 @@ public final class FBLifecycleConnector {
         started = true
 
         let center = NotificationCenter.default
-        observers.append(center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak client] _ in
-            client?.setForeground(true)
+        observers.append(center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.endBackgroundHold()
+            self?.client.setForeground(true)
         })
-        observers.append(center.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak client] _ in
-            client?.setForeground(false)
+        observers.append(center.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.client.setForeground(false)
+            // Unlike Android, iOS suspends the process shortly after backgrounding, freezing the
+            // client's grace timer before it can pause streaming (the pause would otherwise fire
+            // only on foreground thaw). Hold background execution just long enough for the timer
+            // to fire and the socket to close cleanly. iOS caps this allowance (~30s): grace
+            // periods beyond the cap degrade to pausing on the next foreground instead.
+            self?.beginBackgroundHold()
         })
 
         monitor.pathUpdateHandler = { [weak client] path in
@@ -55,6 +70,23 @@ public final class FBLifecycleConnector {
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         observers.removeAll()
         monitor.cancel()
+        endBackgroundHold()
+    }
+
+    private func beginBackgroundHold() {
+        endBackgroundHold()
+        backgroundHold = UIApplication.shared.beginBackgroundTask(withName: "co.featbit.streaming-grace") { [weak self] in
+            self?.endBackgroundHold()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + backgroundGracePeriod + Self.holdBuffer) { [weak self] in
+            self?.endBackgroundHold()
+        }
+    }
+
+    private func endBackgroundHold() {
+        guard backgroundHold != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundHold)
+        backgroundHold = .invalid
     }
 
     deinit { stop() }
