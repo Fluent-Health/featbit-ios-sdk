@@ -46,7 +46,7 @@ final class StreamingDataSynchronizer: NSObject, DataSynchronizer, @unchecked Se
         self.secret = options.secret
         self.user = user
         self.store = store
-        self.streamingEndpoint = StreamingDataSynchronizer.toStreamingHttpURL(options.streamingUri)
+        self.streamingEndpoint = StreamingDataSynchronizer.toStreamingWsURL(options.streamingUri)
         self.session = session ?? URLSession(configuration: .ephemeral)
         super.init()
     }
@@ -207,13 +207,15 @@ final class StreamingDataSynchronizer: NSObject, DataSynchronizer, @unchecked Se
         startGate.complete(false)
     }
 
-    /// Accepts `ws(s)://` (or `http(s)://`) and returns the `/streaming` HTTP(S) URL the WebSocket uses.
-    private static func toStreamingHttpURL(_ uri: String) -> URL {
+    /// Accepts `ws(s)://` (or `http(s)://`) and returns the `/streaming` WS(S) URL the WebSocket
+    /// uses. Unlike OkHttp on Android (which wants `http(s)`), `URLSessionWebSocketTask` accepts
+    /// only `ws`/`wss` schemes and throws `NSGenericException` for anything else.
+    static func toStreamingWsURL(_ uri: String) -> URL {
         var s = uri
-        if s.hasPrefix("wss") {
-            s = "https" + s.dropFirst(3)
-        } else if s.hasPrefix("ws") {
-            s = "http" + s.dropFirst(2)
+        if s.hasPrefix("https") {
+            s = "wss" + s.dropFirst(5)
+        } else if s.hasPrefix("http") {
+            s = "ws" + s.dropFirst(4)
         }
         return URL(string: s)!.appendingPathComponent("streaming")
     }
