@@ -3,13 +3,10 @@
 A minimal SwiftUI app demonstrating the FeatBit Swift SDK: streaming sync, a `FeatBit`
 `ObservableObject` driving live UI, and `FBLifecycleConnector` for background-pause/foreground-resync.
 
-## Status
+The app **sources** live in `Sources/` (`FeatBitExampleApp.swift`, `ContentView.swift`). To keep the
+repository toolchain-agnostic, the Xcode project is not committed — create one in a few steps.
 
-The app **sources** live in `Sources/` (`FeatBitExampleApp.swift`, `ContentView.swift`). The Xcode
-project (`FeatBitExampleApp.xcodeproj`) is **not** committed — an iOS developer creates it on a Mac
-(see the repository [`HANDOVER.md`](../../HANDOVER.md)). CI's macOS job expects that project.
-
-## Creating the project (on a Mac)
+## Running it (on a Mac)
 
 1. In Xcode: **File ▸ New ▸ Project ▸ App** (SwiftUI lifecycle). Name it `FeatBitExampleApp`, save it
    here (`Examples/FeatBitExampleApp/`).

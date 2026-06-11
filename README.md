@@ -14,10 +14,6 @@ Be aware, this is a **client-side** SDK intended for use in a single-user contex
 desktop, or embedded applications. It is **not** intended for multi-user systems such as web
 servers. For server-side use, see FeatBit's server SDKs.
 
-> **Project status:** the core SDK is implemented and unit-tested; the SwiftUI/UIKit/streaming
-> pieces and the example app are completed in source but verified on macOS/Xcode (see
-> [`HANDOVER.md`](./HANDOVER.md)).
-
 ## Getting Started
 
 ### Installation
@@ -250,8 +246,9 @@ swift build
 swift test           # unit tests (no network/Docker required)
 ```
 
-The SwiftUI/UIKit/streaming targets and the example app require macOS + Xcode; see
-[`HANDOVER.md`](./HANDOVER.md).
+The `FeatBitClient` core builds on Linux and macOS. The `FeatBitSwiftUI`/`FeatBitLifecycle` products
+and the real-time WebSocket streaming runtime are Apple-only (guarded with `#if canImport(...)`), so
+build them with macOS + Xcode.
 
 ## End-to-end tests
 

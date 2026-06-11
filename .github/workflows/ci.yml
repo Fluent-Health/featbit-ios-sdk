@@ -2,6 +2,8 @@ name: CI
 
 on:
   pull_request:
+  push:
+    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -35,7 +37,7 @@ jobs:
         run: swift build
       - name: Test (incl. SwiftUI / streaming targets)
         run: swift test
-      - name: Build example app (once its Xcode project exists — see HANDOVER.md)
+      - name: Build example app
         run: |
           if [ -d Examples/FeatBitExampleApp/FeatBitExampleApp.xcodeproj ]; then
             xcodebuild \
@@ -44,16 +46,12 @@ jobs:
               -destination 'generic/platform=iOS' \
               build
           else
-            echo "Example .xcodeproj not present yet; skipping (created on macOS per HANDOVER.md)."
+            echo "Example .xcodeproj not present; skipping example-app build."
           fi
 
   e2e:
     name: End-to-end (Docker)
     runs-on: ubuntu-latest
-    # Provisional: the Docker-backed full-stack E2E has not yet been validated end-to-end (see
-    # HANDOVER.md). Non-blocking until an iOS dev confirms it on a Docker host; streaming E2E is
-    # additionally Apple-only and skips here. Flip to blocking once validated.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: swift-actions/setup-swift@v2
