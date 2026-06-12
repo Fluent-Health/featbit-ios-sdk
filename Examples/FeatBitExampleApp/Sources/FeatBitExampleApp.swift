@@ -36,7 +36,8 @@ struct FeatBitExampleApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(featBit)
-                .task { await client.start(timeout: 5) }
+                // .onAppear, not .task: the latter is iOS 15+ and the app targets the SDK's iOS 14 floor.
+                .onAppear { [client] in Task { await client.start(timeout: 5) } }
         }
     }
 }

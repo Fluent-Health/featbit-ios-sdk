@@ -1,0 +1,343 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		6D8BCD4C97AE2C15D63EF4D5 /* FeatBitSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = CFFDF4F62EA74705D2117216 /* FeatBitSwiftUI */; };
+		6DB2090B1B33CDFD94CC08F1 /* FeatBitLifecycle in Frameworks */ = {isa = PBXBuildFile; productRef = 6479FBFB49C3DD3879DD6D06 /* FeatBitLifecycle */; };
+		9B4B6253B4D2D3299C4FB418 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7999FDD6ED5E579C12FD2DB /* ContentView.swift */; };
+		C577E15C8472EF32BE07AA6C /* FeatBitExampleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11515ADCB7EA89223E241841 /* FeatBitExampleApp.swift */; };
+		D5029F9B9DF9338E2C24E97F /* FeatBitClient in Frameworks */ = {isa = PBXBuildFile; productRef = 2CE98FF1FA444B6E4CFD7849 /* FeatBitClient */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		11515ADCB7EA89223E241841 /* FeatBitExampleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatBitExampleApp.swift; sourceTree = "<group>"; };
+		ACEAAB4884C7069CF03150CA /* FeatBitExampleApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FeatBitExampleApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BAA49C8D47F3B424E5458A3D /* featbit-ios-sdk */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "featbit-ios-sdk"; path = ../..; sourceTree = SOURCE_ROOT; };
+		F7999FDD6ED5E579C12FD2DB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		2CE3639952D58F7167B74793 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D5029F9B9DF9338E2C24E97F /* FeatBitClient in Frameworks */,
+				6D8BCD4C97AE2C15D63EF4D5 /* FeatBitSwiftUI in Frameworks */,
+				6DB2090B1B33CDFD94CC08F1 /* FeatBitLifecycle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		30352A4A825A7EB7AC92EE0F /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				BAA49C8D47F3B424E5458A3D /* featbit-ios-sdk */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		67B5146C1EDBF081FCED2CDF /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				F7999FDD6ED5E579C12FD2DB /* ContentView.swift */,
+				11515ADCB7EA89223E241841 /* FeatBitExampleApp.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		7651EE1BCAC6B4C19D45172D = {
+			isa = PBXGroup;
+			children = (
+				30352A4A825A7EB7AC92EE0F /* Packages */,
+				67B5146C1EDBF081FCED2CDF /* Sources */,
+				A22FEBF4237EC510D0EB5D0A /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A22FEBF4237EC510D0EB5D0A /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				ACEAAB4884C7069CF03150CA /* FeatBitExampleApp.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C71F86D2E1C3B654C658FD6F /* FeatBitExampleApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 434F74844F1AB065BC24420F /* Build configuration list for PBXNativeTarget "FeatBitExampleApp" */;
+			buildPhases = (
+				362906867E941AF678D4C9B1 /* Sources */,
+				2CE3639952D58F7167B74793 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FeatBitExampleApp;
+			packageProductDependencies = (
+				2CE98FF1FA444B6E4CFD7849 /* FeatBitClient */,
+				CFFDF4F62EA74705D2117216 /* FeatBitSwiftUI */,
+				6479FBFB49C3DD3879DD6D06 /* FeatBitLifecycle */,
+			);
+			productName = FeatBitExampleApp;
+			productReference = ACEAAB4884C7069CF03150CA /* FeatBitExampleApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D494F6FAE3D1380C77539ADC /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1540;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = B507AA80CCD96B6ABC8BFD91 /* Build configuration list for PBXProject "FeatBitExampleApp" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 7651EE1BCAC6B4C19D45172D;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D37D0D040397DD6AEF2F01EC /* XCLocalSwiftPackageReference "../.." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A22FEBF4237EC510D0EB5D0A /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C71F86D2E1C3B654C658FD6F /* FeatBitExampleApp */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		362906867E941AF678D4C9B1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9B4B6253B4D2D3299C4FB418 /* ContentView.swift in Sources */,
+				C577E15C8472EF32BE07AA6C /* FeatBitExampleApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		820C28AE9E7A9F994611DF6E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.fluentinhealth.FeatBitExampleApp;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C54E93877E587E8E944CB2BA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		F67F522E168C01765A33EC12 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.fluentinhealth.FeatBitExampleApp;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		FF918C271C64A294EB9F4D94 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		434F74844F1AB065BC24420F /* Build configuration list for PBXNativeTarget "FeatBitExampleApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				820C28AE9E7A9F994611DF6E /* Debug */,
+				F67F522E168C01765A33EC12 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B507AA80CCD96B6ABC8BFD91 /* Build configuration list for PBXProject "FeatBitExampleApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C54E93877E587E8E944CB2BA /* Debug */,
+				FF918C271C64A294EB9F4D94 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		D37D0D040397DD6AEF2F01EC /* XCLocalSwiftPackageReference "../.." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2CE98FF1FA444B6E4CFD7849 /* FeatBitClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FeatBitClient;
+		};
+		6479FBFB49C3DD3879DD6D06 /* FeatBitLifecycle */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FeatBitLifecycle;
+		};
+		CFFDF4F62EA74705D2117216 /* FeatBitSwiftUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FeatBitSwiftUI;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = D494F6FAE3D1380C77539ADC /* Project object */;
+}

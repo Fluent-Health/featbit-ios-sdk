@@ -1,0 +1,33 @@
+name: FeatBitExampleApp
+options:
+  bundleIdPrefix: com.fluentinhealth
+  # Keep the generated project readable by Xcode 15.4 (the SDK's minimum / CI's macos-14 runner):
+  # after regenerating, set `objectVersion = 56` in project.pbxproj (newer XcodeGen emits 77,
+  # which Xcode 15 cannot parse).
+  xcodeVersion: "15.4"
+  deploymentTarget:
+    iOS: "14.0"
+packages:
+  featbit-ios-sdk:
+    path: ../..
+targets:
+  FeatBitExampleApp:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    dependencies:
+      - package: featbit-ios-sdk
+        product: FeatBitClient
+      - package: featbit-ios-sdk
+        product: FeatBitSwiftUI
+      - package: featbit-ios-sdk
+        product: FeatBitLifecycle
+    info:
+      path: Info.plist
+      properties:
+        UILaunchScreen: {}
+        CFBundleDisplayName: FeatBit Example
+    settings:
+      base:
+        CODE_SIGNING_ALLOWED: "NO"
+        SWIFT_VERSION: "5.9"
