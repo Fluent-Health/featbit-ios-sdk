@@ -140,8 +140,8 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
             return EvalDetail(reason: "client not ready", value: defaultValue)
         }
 
-        let (evalResult, flag) = evaluator.evaluate(key)
-        guard evalResult.isValid, let flag else {
+        let evalResult = evaluator.evaluate(key)
+        guard case .found(let flag) = evalResult else {
             return EvalDetail(reason: evalResult.reason, value: defaultValue)
         }
 
@@ -150,8 +150,8 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
         let ts = Int64(Date().timeIntervalSince1970 * 1000)
         Task { [weak self] in await self?.trackInsight.run(Insight.forEvaluation(user: currentUser, flag: flag, timestamp: ts)) }
 
-        if let typed = converter(evalResult.value) {
-            return EvalDetail(reason: evalResult.reason, value: typed)
+        if let typed = converter(flag.variation) {
+            return EvalDetail(reason: flag.matchReason, value: typed)
         } else {
             return EvalDetail(reason: "type mismatch", value: defaultValue)
         }

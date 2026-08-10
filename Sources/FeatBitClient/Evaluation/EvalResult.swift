@@ -1,15 +1,33 @@
 import Foundation
 
 /// Internal result of looking a flag up in the store, prior to type conversion.
-struct EvalResult {
-    let isValid: Bool
-    let reason: String
-    let value: String
+///
+/// Sealed enum: callers pattern-match instead of consulting a boolean `isValid`.
+/// Wire-compatible `reason` strings preserved.
+enum EvalResult: Equatable {
+    case found(FeatureFlag)
+    case notFound(reason: String)
 
-    /// The caller provided a key that did not match any known flag.
-    static let flagNotFound = EvalResult(isValid: false, reason: "flag not found", value: "")
-
-    static func of(_ flag: FeatureFlag) -> EvalResult {
-        EvalResult(isValid: true, reason: flag.matchReason, value: flag.variation)
+    /// Wire-compatible reason string (matches what the .NET / Kotlin SDKs emit).
+    var reason: String {
+        switch self {
+        case .found(let flag): return flag.matchReason
+        case .notFound(let reason): return reason
+        }
     }
+
+    /// True when the result carries a matched flag. Retained for test ergonomics;
+    /// production callers pattern-match on the case instead.
+    var isValid: Bool {
+        if case .found = self { return true } else { return false }
+    }
+
+    /// Raw variation string when `.found`, empty otherwise. Retained for test
+    /// ergonomics; production callers extract `flag.variation` via pattern match.
+    var value: String {
+        if case .found(let flag) = self { return flag.variation } else { return "" }
+    }
+
+    /// Reserved reason for a missing flag.
+    static let flagNotFound: EvalResult = .notFound(reason: "flag not found")
 }
