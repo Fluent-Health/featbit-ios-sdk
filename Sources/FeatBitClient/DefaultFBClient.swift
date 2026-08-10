@@ -177,17 +177,3 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
         trackInsight.close()
     }
 }
-
-/// Runs `operation`, returning its result, or `false` if it does not complete within `seconds`.
-private func withTimeout(seconds: TimeInterval, _ operation: @escaping @Sendable () async -> Bool) async -> Bool {
-    await withTaskGroup(of: Bool.self) { group in
-        group.addTask { await operation() }
-        group.addTask {
-            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-            return false
-        }
-        let result = await group.next() ?? false
-        group.cancelAll()
-        return result
-    }
-}
