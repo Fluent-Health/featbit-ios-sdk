@@ -99,6 +99,13 @@ alternatives:
    Accepted; the alternative (making the port internal) collapses the
    boundary and forces the adapter into the same file, defeating the split.
 
+4. **`Model.FBUser` stores a cached `Wire.EndUser`.** The perf pass (Task 25)
+   precomputes the wire form once per identify to avoid rebuilding the graph
+   on every evaluation. `Model/` sits above `Data/App/Domain` in the public-API
+   layer, so a downward dependency onto `Wire/` (a Codable-only leaf) does not
+   violate the layer rule; the cached property is `internal` (not part of
+   `FBUser`'s public surface).
+
 ## Kotlin → Swift translation table (from the design spec)
 
 | Kotlin | Swift | Notes |

@@ -210,6 +210,9 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
     /// Fire-and-forget close. Returns immediately; teardown runs on a background Task.
     /// Callers migrating from the .NET / Kotlin SDKs should be aware this no longer
     /// blocks — use ``closeAndJoin()`` to await teardown.
+    ///
+    /// A closed `DefaultFBClient` is single-use: subsequent `start()` / `identify()`
+    /// calls will not resurrect the pipeline. Construct a fresh client to reconnect.
     public func close() {
         Task { [weak self] in await self?.closeAndJoin() }
     }
