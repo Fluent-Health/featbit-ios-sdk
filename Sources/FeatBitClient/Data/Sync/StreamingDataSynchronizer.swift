@@ -130,7 +130,7 @@ final class StreamingDataSynchronizer: NSObject, DataSynchronizer, @unchecked Se
             let envelope = try FbApiClient.decoder.decode(ServerEnvelope.self, from: data)
             guard envelope.messageType == "data-sync", let payloadData = envelope.data else { return }
             let payload = try FbApiClient.decoder.decode(DataSyncPayload.self, from: payloadData)
-            for flag in payload.featureFlags { store.upsert(flag) }
+            store.upsertAll(payload.featureFlags)
 
             let wasInitialized = lock.withLock { () -> Bool in
                 timestamp = Int64(Date().timeIntervalSince1970 * 1000)

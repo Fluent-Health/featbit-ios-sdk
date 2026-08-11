@@ -65,7 +65,7 @@ final class PollingDataSynchronizer: DataSynchronizer, @unchecked Sendable {
         lock.withLock { timestamp = Int64(Date().timeIntervalSince1970 * 1000) }
         logger.debug { "Polling received \(response.flags.count) flags." }
 
-        for flag in response.flags { store.upsert(flag) }
+        store.upsertAll(response.flags)
 
         let wasInitialized = lock.withLock { () -> Bool in
             let was = _initialized

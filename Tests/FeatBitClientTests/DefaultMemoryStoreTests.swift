@@ -150,4 +150,88 @@ final class DefaultMemoryStoreTests: XCTestCase {
         store.upsert(FeatureFlag(id: "k", variation: "v"))
         XCTAssertEqual(l.fireCount, 1, "re-adding same listener must not multiply fires")
     }
+
+    // MARK: Aggressive pinning (Task 26) — upsertAll semantics.
+
+    func testUpsertAllEmptyBatchIsNoOp() {
+        // Mutation: dropping the `if flags.isEmpty { return }` short-circuit would
+        // still take the lock + do nothing — harmless but wastes cycles. This test
+        // guards the listener no-op contract: listeners must not receive a spurious
+        // empty-batch signal.
+        let store = DefaultMemoryStore()
+        var fired = 0
+        let listener = ObservingListener { _ in fired += 1 }
+        store.addChangeListener(listener)
+        store.upsertAll([])
+        XCTAssertEqual(fired, 0)
+    }
+
+    func testUpsertAllNewFlagEventsFireInOrder() {
+        // Mutation: replacing `events.append(...)` inside the loop with a set-based
+        // dedupe would drop later events for the same key. Test asserts ORDER
+        // matches input, one event per new flag.
+        let store = DefaultMemoryStore()
+        var order: [String] = []
+        let listener = ObservingListener { order.append($0.key) }
+        store.addChangeListener(listener)
+        store.upsertAll([
+            FeatureFlag(id: "a", variation: "1"),
+            FeatureFlag(id: "b", variation: "2"),
+            FeatureFlag(id: "c", variation: "3"),
+        ])
+        XCTAssertEqual(order, ["a", "b", "c"])
+    }
+
+    func testUpsertAllUnchangedFlagsSkipEvents() {
+        // Mutation: emitting an event for unchanged variations would fire twice per
+        // "no-op" upsert. Test uses a pre-populated store and asserts unchanged
+        // flags don't fire.
+        let store = DefaultMemoryStore(bootstrap: [FeatureFlag(id: "a", variation: "same")])
+        var events: [FlagValueChangedEvent] = []
+        let listener = ObservingListener { events.append($0) }
+        store.addChangeListener(listener)
+        store.upsertAll([
+            FeatureFlag(id: "a", variation: "same"),   // unchanged
+            FeatureFlag(id: "b", variation: "new"),    // new
+        ])
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events.first?.key, "b")
+    }
+
+    func testUpsertAllOldValueIsPreBatch() {
+        // Mutation: computing oldValue AFTER the batch writes complete would report
+        // the NEW value for the second flag in a batch that touches related keys.
+        // Test: bootstrap has "a"=v1; upsertAll changes "a" to v2. Listener sees
+        // oldValue==v1 (pre-batch), not v2.
+        let store = DefaultMemoryStore(bootstrap: [FeatureFlag(id: "a", variation: "v1")])
+        var reportedOld: String??
+        let listener = ObservingListener { reportedOld = $0.oldValue }
+        store.addChangeListener(listener)
+        store.upsertAll([FeatureFlag(id: "a", variation: "v2")])
+        XCTAssertEqual(reportedOld, "v1" as String?)
+    }
+
+    func testUpsertAllListenerSeesConsistentPostBatchSnapshot() {
+        // Mutation: notifying listeners INSIDE the write lock (after each item)
+        // would let the listener re-enter store.get("b") and see a not-yet-written
+        // "b". This test's listener reads b when notified for a; b must be
+        // present because the batch commits BOTH writes before notifying.
+        let store = DefaultMemoryStore()
+        var seenBWhenAFires: String?
+        let listener = ObservingListener { event in
+            if event.key == "a" { seenBWhenAFires = store.get("b")?.variation }
+        }
+        store.addChangeListener(listener)
+        store.upsertAll([
+            FeatureFlag(id: "a", variation: "va"),
+            FeatureFlag(id: "b", variation: "vb"),
+        ])
+        XCTAssertEqual(seenBWhenAFires, "vb", "listener for a should observe post-batch state of b")
+    }
+}
+
+private final class ObservingListener: FlagChangeListener {
+    let onChangeCallback: (FlagValueChangedEvent) -> Void
+    init(_ cb: @escaping (FlagValueChangedEvent) -> Void) { onChangeCallback = cb }
+    func onChange(_ event: FlagValueChangedEvent) { onChangeCallback(event) }
 }
