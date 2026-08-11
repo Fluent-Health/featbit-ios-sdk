@@ -207,6 +207,25 @@ final class StreamingDataSynchronizer: NSObject, DataSynchronizer, @unchecked Se
         startGate.complete(false)
     }
 
+    func closeAndJoin() async {
+        var task: URLSessionWebSocketTask?
+        var hb: Task<Void, Never>?
+        let proceed: Bool = lock.withLock {
+            if closed { return false }
+            closed = true
+            hb = heartbeatTask
+            heartbeatTask = nil
+            task = webSocket
+            webSocket = nil
+            return true
+        }
+        guard proceed else { return }
+        task?.cancel(with: .normalClosure, reason: nil)
+        hb?.cancel()
+        if let hb { _ = await hb.value }
+        startGate.complete(false)
+    }
+
     // MARK: Wire models
 
     private struct ClientMessage<T: Encodable>: Encodable {
@@ -330,6 +349,8 @@ final class StreamingDataSynchronizer: DataSynchronizer, @unchecked Sendable {
     }
 
     func close() {}
+
+    func closeAndJoin() async { close() }
 }
 
 #endif

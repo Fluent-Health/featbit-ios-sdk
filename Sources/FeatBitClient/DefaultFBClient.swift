@@ -75,7 +75,7 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
             return (old, fresh)
         }
 
-        old.close()
+        await old.closeAndJoin()
 
         let success = await withTimeout(seconds: timeout) {
             await fresh.start()

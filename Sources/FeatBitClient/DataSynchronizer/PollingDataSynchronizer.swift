@@ -92,4 +92,19 @@ final class PollingDataSynchronizer: DataSynchronizer, @unchecked Sendable {
         task?.cancel()
         startGate.complete(false)
     }
+
+    func closeAndJoin() async {
+        var task: Task<Void, Never>?
+        let shouldComplete: Bool = lock.withLock {
+            if closed { return false }
+            closed = true
+            task = loopTask
+            loopTask = nil
+            return true
+        }
+        guard shouldComplete else { return }
+        task?.cancel()
+        if let task { _ = await task.value }
+        startGate.complete(false)
+    }
 }
