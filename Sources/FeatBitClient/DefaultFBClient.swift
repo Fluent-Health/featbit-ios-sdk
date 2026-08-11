@@ -9,6 +9,7 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
     private let evaluator: Evaluator
     private let flagTrackerImpl: FlagTrackerImpl
     private let trackInsight: TrackInsight
+    private let insightDispatcher: InsightDispatcher
 
     private let lock = Lock()
     private var user: FBUser
@@ -26,6 +27,8 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
         self.evaluator = Evaluator(store: store)
         self.flagTrackerImpl = FlagTrackerImpl(store: store)
         self.trackInsight = options.offline ? NoopTrackInsight() : HttpTrackInsight(options: options)
+        self.insightDispatcher = InsightDispatcher(tracker: self.trackInsight, logger: options.logger)
+        self.insightDispatcher.start()
         self.user = user
         self.dataSynchronizer = DefaultFBClient.newDataSynchronizer(options: options, user: user, store: store)
         self.lifecycle = LifecycleController(graceSeconds: options.backgroundGracePeriod) { [weak self] in
@@ -145,10 +148,10 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
             return EvalDetail(reason: evalResult.reason, value: defaultValue)
         }
 
-        // Fire-and-forget the evaluation insight.
+        // Non-suspending emit onto the bounded batching pipeline.
         let currentUser = currentUserSnapshot()
         let ts = Int64(Date().timeIntervalSince1970 * 1000)
-        Task { [weak self] in await self?.trackInsight.run(Insight.forEvaluation(user: currentUser, flag: flag, timestamp: ts)) }
+        insightDispatcher.offer(Insight.forEvaluation(user: currentUser, flag: flag, timestamp: ts))
 
         if let typed = converter(flag.variation) {
             return EvalDetail(reason: flag.matchReason, value: typed)
@@ -174,6 +177,8 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
     public func close() {
         currentSynchronizer.close()
         flagTrackerImpl.close()
+        // Fire-and-forget the dispatcher drain; Task 8 tightens this into an async close().
+        Task { [insightDispatcher] in await insightDispatcher.closeAndDrain() }
         trackInsight.close()
     }
 }
