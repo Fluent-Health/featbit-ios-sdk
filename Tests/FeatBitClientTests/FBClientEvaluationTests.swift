@@ -122,4 +122,27 @@ final class FBClientEvaluationTests: XCTestCase {
         XCTAssertTrue(ok, "offline identify must be true — Null synchronizer is vacuously ready")
         await client.closeAndJoin()
     }
+
+    func testValueAndDetailPathsAgreeAcrossConverters() async throws {
+        let flags: [FeatureFlag] = [
+            FeatureFlag(id: "b", variation: "true", matchReason: "T"),
+            FeatureFlag(id: "i", variation: "42", matchReason: "T"),
+            FeatureFlag(id: "s", variation: "hello", matchReason: "T"),
+        ]
+        let client = try offlineClient(flags)
+        _ = await client.start(timeout: 1)
+        XCTAssertEqual(client.boolVariation("b", default: false), client.boolVariationDetail("b", default: false).value)
+        XCTAssertEqual(client.intVariation("i", default: 0), client.intVariationDetail("i", default: 0).value)
+        XCTAssertEqual(client.stringVariation("s", default: ""), client.stringVariationDetail("s", default: "").value)
+        await client.closeAndJoin()
+    }
+
+    func testFastPathGuardNotReadyReturnsDefault() async throws {
+        // Mutation: dropping the `if !initialized && options.bootstrap.isEmpty` guard
+        // in evaluateValue would let evaluations skip past the not-ready check.
+        let options = try FBOptions.Builder("secret").polling("https://p.example.com").build()
+        let client = DefaultFBClient(options: options, user: FBUser.builder("u").build())
+        XCTAssertEqual(client.stringVariation("k", default: "default"), "default")
+        client.close()
+    }
 }
