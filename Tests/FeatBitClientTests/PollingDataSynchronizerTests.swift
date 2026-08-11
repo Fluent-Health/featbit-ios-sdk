@@ -14,6 +14,15 @@ final class PollingDataSynchronizerTests: XCTestCase {
         return PollingDataSynchronizer(options: options, user: user, store: store, getUserFlags: getUserFlags)
     }
 
+    private func makeFastSynchronizer(store: MemoryStore, interval: TimeInterval) throws -> PollingDataSynchronizer {
+        let options = try FBOptions.Builder("secret")
+            .polling("https://eval.example.com", interval: interval)
+            .build()
+        let user = FBUser.builder("u1").build()
+        let getUserFlags = GetUserFlags(options: options, user: user, session: MockURLProtocol.session())
+        return PollingDataSynchronizer(options: options, user: user, store: store, getUserFlags: getUserFlags)
+    }
+
     func testStartInitializesAndPopulatesStore() async throws {
         MockURLProtocol.handler = { _ in
             let body = #"{"data":{"featureFlags":[{"id":"f1","variation":"true","matchReason":"default"}]}}"#
@@ -84,5 +93,43 @@ final class PollingDataSynchronizerTests: XCTestCase {
         // start() may return true (first poll succeeded before close) or false
         // (closeAndJoin completed startGate first). Either is acceptable — the race pin
         // is that closeAndJoin blocked until upsert completed, not the start() outcome.
+    }
+
+    // MARK: Aggressive pinning (Task 12) — loop cadence + transient 5xx recovery.
+
+    func testPollingLoopIssuesRepeatedRequestsAcrossInterval() async throws {
+        // Mutation: removing the `while !Task.isCancelled` loop in pollingLoop
+        // would produce exactly 1 request.
+        MockURLProtocol.reset()
+        let body = #"{"data":{"featureFlags":[{"id":"f1","variation":"true","matchReason":"default"}]}}"#
+        MockURLProtocol.handler = { _ in (200, Data(body.utf8)) }
+
+        let store = DefaultMemoryStore()
+        let sync = try makeFastSynchronizer(store: store, interval: 0.05)
+        let started = Task { await sync.start() }
+        try await Task.sleep(nanoseconds: 200_000_000) // ~4 polling intervals
+        await sync.closeAndJoin()
+        _ = await started.value
+        XCTAssertGreaterThanOrEqual(MockURLProtocol.requests.count, 3, "polling loop should issue ≥3 requests within 200ms at 50ms interval")
+    }
+
+    func testTransient500DoesNotStopLoopAndNext200Initializes() async throws {
+        // Mutation: treating 500 as fatal (adding response.statusCode == 500 to
+        // isFatal) would call close() inside safePoll, and start() would return false.
+        MockURLProtocol.reset()
+        let call = NSLock()
+        var callCount = 0
+        MockURLProtocol.handler = { _ in
+            call.lock(); callCount += 1; let n = callCount; call.unlock()
+            if n == 1 { return (500, Data()) }
+            let body = #"{"data":{"featureFlags":[{"id":"f1","variation":"recovered","matchReason":"default"}]}}"#
+            return (200, Data(body.utf8))
+        }
+        let store = DefaultMemoryStore()
+        let sync = try makeFastSynchronizer(store: store, interval: 0.05)
+        let ready = await withTimeout(seconds: 2.0) { await sync.start() }
+        XCTAssertEqual(ready, true, "transient 500 should not stop the loop; next 200 should initialize")
+        XCTAssertEqual(store.get("f1")?.variation, "recovered")
+        await sync.closeAndJoin()
     }
 }
