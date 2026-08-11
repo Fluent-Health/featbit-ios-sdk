@@ -63,15 +63,22 @@ final class LoopbackWebSocketServer: @unchecked Sendable {
             if let ctx = ctx,
                let meta = ctx.protocolMetadata.first as? NWProtocolWebSocket.Metadata {
                 if meta.opcode == .close {
-                    if let data, data.count >= 2 {
-                        let code = Int(UInt16(data[0]) << 8 | UInt16(data[1]))
-                        let reason: String? = data.count > 2
-                            ? String(data: data.subdata(in: 2..<data.count), encoding: .utf8)
-                            : nil
-                        self.lock.withLock {
-                            self.closeCode = code
-                            self.closeReason = reason
-                        }
+                    // Network.framework parses the 2-byte close status out of the frame body and
+                    // exposes it via `meta.closeCode` — `data` contains only the reason bytes.
+                    // Older builds of this helper mis-read the code from the first two reason
+                    // bytes (e.g. "paused" → code=0x7075="pu", reason="used"). Read from the
+                    // metadata instead, and take the entire `data` payload as the reason.
+                    let codeInt: Int?
+                    switch meta.closeCode {
+                    case .protocolCode(let defined): codeInt = Int(defined.rawValue)
+                    case .applicationCode(let raw): codeInt = Int(raw)
+                    case .privateCode(let raw): codeInt = Int(raw)
+                    @unknown default: codeInt = nil
+                    }
+                    let reason: String? = (data.flatMap { $0.isEmpty ? nil : String(data: $0, encoding: .utf8) })
+                    self.lock.withLock {
+                        self.closeCode = codeInt
+                        self.closeReason = reason
                     }
                     return
                 } else if meta.opcode == .text, let data,
