@@ -23,6 +23,7 @@ final class StreamingDataSynchronizer: NSObject, DataSynchronizer, @unchecked Se
     private let store: MemoryStore
     private let streamingEndpoint: URL
     private let session: URLSession
+    private let ownsSession: Bool
 
     private let startGate = StartGate()
     private let lock = Lock()
@@ -30,6 +31,7 @@ final class StreamingDataSynchronizer: NSObject, DataSynchronizer, @unchecked Se
     private var timestamp: Int64 = 0
     private var webSocket: URLSessionWebSocketTask?
     private var heartbeatTask: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
     private var reconnectAttempts = 0
     private var reconnecting = false
     private var paused = false
@@ -47,6 +49,7 @@ final class StreamingDataSynchronizer: NSObject, DataSynchronizer, @unchecked Se
         self.user = user
         self.store = store
         self.streamingEndpoint = options.endpoints.streamingWs
+        self.ownsSession = (session == nil)
         self.session = session ?? URLSession(configuration: .ephemeral)
         super.init()
     }
@@ -121,6 +124,7 @@ final class StreamingDataSynchronizer: NSObject, DataSynchronizer, @unchecked Se
     }
 
     private func handleMessage(_ text: String) {
+        if lock.withLock({ closed }) { return }
         guard let data = text.data(using: .utf8) else { return }
         do {
             let envelope = try FbApiClient.decoder.decode(ServerEnvelope.self, from: data)
@@ -158,28 +162,33 @@ final class StreamingDataSynchronizer: NSObject, DataSynchronizer, @unchecked Se
         let shift = min(attempt, 6)
         let backoff = min(StreamingDataSynchronizer.maxBackoffMs, StreamingDataSynchronizer.baseBackoffMs << shift) + Int64.random(in: 0..<250)
         logger.warn("Streaming disconnected (\(reason)); reconnecting in \(backoff)ms (attempt \(attempt)).")
-        Task { [weak self] in
+        let task = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(backoff) * 1_000_000)
             guard let self else { return }
+            if Task.isCancelled { return }
             self.lock.withLock { self.reconnecting = false }
             self.connect()
         }
+        lock.withLock { reconnectTask = task }
     }
 
     func pause() {
         var proceed = false
-        let task = lock.withLock { () -> URLSessionWebSocketTask? in
-            if closed || paused { return nil }
+        let (task, reconnect): (URLSessionWebSocketTask?, Task<Void, Never>?) = lock.withLock {
+            if closed || paused { return (nil, nil) }
             paused = true
             reconnecting = false
             heartbeatTask?.cancel()
+            let r = reconnectTask
+            reconnectTask = nil
             proceed = true
             let t = webSocket
             webSocket = nil
-            return t
+            return (t, r)
         }
         guard proceed else { return }
         task?.cancel(with: .normalClosure, reason: "paused".data(using: .utf8))
+        reconnect?.cancel()
         logger.debug { "Streaming paused." }
     }
 
@@ -196,20 +205,26 @@ final class StreamingDataSynchronizer: NSObject, DataSynchronizer, @unchecked Se
     }
 
     func close() {
-        let task = lock.withLock { () -> URLSessionWebSocketTask? in
+        let (task, reconnect): (URLSessionWebSocketTask?, Task<Void, Never>?) = lock.withLock {
             closed = true
             heartbeatTask?.cancel()
+            heartbeatTask = nil
+            let r = reconnectTask
+            reconnectTask = nil
             let t = webSocket
             webSocket = nil
-            return t
+            return (t, r)
         }
         task?.cancel(with: .normalClosure, reason: nil)
+        reconnect?.cancel()
+        if ownsSession { session.invalidateAndCancel() }
         startGate.complete(false)
     }
 
     func closeAndJoin() async {
         var task: URLSessionWebSocketTask?
         var hb: Task<Void, Never>?
+        var reconnect: Task<Void, Never>?
         let proceed: Bool = lock.withLock {
             if closed { return false }
             closed = true
@@ -217,12 +232,17 @@ final class StreamingDataSynchronizer: NSObject, DataSynchronizer, @unchecked Se
             heartbeatTask = nil
             task = webSocket
             webSocket = nil
+            reconnect = reconnectTask
+            reconnectTask = nil
             return true
         }
         guard proceed else { return }
         task?.cancel(with: .normalClosure, reason: nil)
         hb?.cancel()
+        reconnect?.cancel()
         if let hb { _ = await hb.value }
+        if let reconnect { _ = await reconnect.value }
+        if ownsSession { session.invalidateAndCancel() }
         startGate.complete(false)
     }
 
