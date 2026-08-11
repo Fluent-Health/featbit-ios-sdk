@@ -47,23 +47,37 @@ final class GetUserFlags: FbApiClient {
             guard result.isSuccessful else {
                 return .error(result.code)
             }
-            if result.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let trimmed = result.body.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
                 return .ok([])
             }
-            let flags = parseFlags(from: result.body)
-            return .ok(flags)
+            do {
+                let data = Data(result.body.utf8)
+                let envelope = try FbApiClient.decoder.decode(LatestAllEnvelope.self, from: data)
+                return .ok(envelope.data.featureFlags)
+            } catch {
+                options.logger.error("Malformed latest-all payload; treating as transient error.", error)
+                return .error(-1)
+            }
         } catch {
             options.logger.error("Exception occurred while polling data.", error)
             return .error(-1)
         }
     }
 
-    private func parseFlags(from body: String) -> [FeatureFlag] {
-        guard let data = body.data(using: .utf8) else { return [] }
-        struct Envelope: Decodable { let data: Payload? }
-        struct Payload: Decodable { let featureFlags: [FeatureFlag]? }
-        let envelope = try? FbApiClient.decoder.decode(Envelope.self, from: data)
-        return envelope?.data?.featureFlags ?? []
+    private struct LatestAllEnvelope: Decodable {
+        let data: LatestAllData
+    }
+
+    private struct LatestAllData: Decodable {
+        let featureFlags: [FeatureFlag]
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            featureFlags = try c.decodeIfPresent([FeatureFlag].self, forKey: .featureFlags) ?? []
+        }
+
+        enum CodingKeys: String, CodingKey { case featureFlags }
     }
 }
 

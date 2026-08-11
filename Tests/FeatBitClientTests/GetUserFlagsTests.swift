@@ -65,4 +65,38 @@ final class GetUserFlagsTests: XCTestCase {
         XCTAssertTrue(response.isError)
         XCTAssertFalse(response.isFatal)
     }
+
+    func testMissingDataFieldReturnsError() async throws {
+        // Mutation: making `data` Optional and defaulting to nil would silently return .ok([]).
+        MockURLProtocol.handler = { _ in (200, Data(#"{"other":"junk"}"#.utf8)) }
+        let response = await (try makeClient()).run(timestamp: 0)
+        XCTAssertTrue(response.isError)
+        XCTAssertFalse(response.isFatal)
+        XCTAssertEqual(response.statusCode, -1)
+    }
+
+    func testNullDataFieldReturnsError() async throws {
+        // Mutation: same as above — explicit null on non-Optional Decodable field throws.
+        MockURLProtocol.handler = { _ in (200, Data(#"{"data":null}"#.utf8)) }
+        let response = await (try makeClient()).run(timestamp: 0)
+        XCTAssertTrue(response.isError)
+        XCTAssertEqual(response.statusCode, -1)
+    }
+
+    func testAbsentFeatureFlagsReturnsOkEmpty() async throws {
+        // Backward-compat: absent inner list -> empty flag array, not error.
+        MockURLProtocol.handler = { _ in (200, Data(#"{"data":{}}"#.utf8)) }
+        let response = await (try makeClient()).run(timestamp: 0)
+        XCTAssertEqual(response.statusCode, 200)
+        XCTAssertFalse(response.isError)
+        XCTAssertTrue(response.flags.isEmpty)
+    }
+
+    func testMalformedJsonReturnsError() async throws {
+        // Mutation: `try?` fallback to empty would let malformed JSON silently pass.
+        MockURLProtocol.handler = { _ in (200, Data(#"{not valid json"#.utf8)) }
+        let response = await (try makeClient()).run(timestamp: 0)
+        XCTAssertTrue(response.isError)
+        XCTAssertEqual(response.statusCode, -1)
+    }
 }
