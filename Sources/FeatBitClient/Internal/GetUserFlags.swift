@@ -29,7 +29,7 @@ final class GetUserFlags: FbApiClient {
     private let payload: Data
 
     init(options: FBOptions, user: FBUser, session: URLSession? = nil) {
-        self.endpoint = URL(string: options.pollingUri)!
+        self.endpoint = options.endpoints.polling
             .appendingPathComponents(HttpConstants.latestAllPath)
         self.payload = (try? FbApiClient.encoder.encode(user.toEndUser())) ?? Data()
         super.init(options: options, session: session)

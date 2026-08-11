@@ -53,7 +53,7 @@ final class FeatBitStreamingE2ETests: XCTestCase {
         // evaluationBaseURL is http://host:port; streaming uses the ws:// form of the same host.
         let streamingURL = seed.evaluationBaseURL.replacingOccurrences(of: "http", with: "ws")
 
-        let options = FBOptions.Builder(seed.clientSecret)
+        let options = try FBOptions.Builder(seed.clientSecret)
             .streaming(streamingURL)
             .event(seed.evaluationBaseURL)
             .backgroundGracePeriod(1)
@@ -85,7 +85,7 @@ final class FeatBitStreamingE2ETests: XCTestCase {
         let stack = try XCTUnwrap(Self.stack)
 
         let streamingURL = seed.evaluationBaseURL.replacingOccurrences(of: "http", with: "ws")
-        let options = FBOptions.Builder(seed.clientSecret)
+        let options = try FBOptions.Builder(seed.clientSecret)
             .streaming(streamingURL)
             .event(seed.evaluationBaseURL)
             .backgroundGracePeriod(1)

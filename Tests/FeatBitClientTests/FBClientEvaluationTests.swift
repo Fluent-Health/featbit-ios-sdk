@@ -2,16 +2,16 @@ import XCTest
 @testable import FeatBitClient
 
 final class FBClientEvaluationTests: XCTestCase {
-    private func offlineClient(_ flags: [FeatureFlag]) -> DefaultFBClient {
-        let options = FBOptions.Builder()
+    private func offlineClient(_ flags: [FeatureFlag]) throws -> DefaultFBClient {
+        let options = try FBOptions.Builder()
             .offline(true)
             .bootstrap(flags)
             .build()
         return DefaultFBClient(options: options, user: FBUser.builder("u1").build())
     }
 
-    func testBootstrapEvaluation() async {
-        let client = offlineClient([
+    func testBootstrapEvaluation() async throws {
+        let client = try offlineClient([
             FeatureFlag(id: "bool-flag", variation: "true", variationType: "boolean", matchReason: "default"),
             FeatureFlag(id: "str-flag", variation: "hello", variationType: "string", matchReason: "rule match"),
             FeatureFlag(id: "int-flag", variation: "42", variationType: "number", matchReason: "default"),
@@ -29,8 +29,8 @@ final class FBClientEvaluationTests: XCTestCase {
         client.close()
     }
 
-    func testUnknownFlagReturnsDefaultWithReason() async {
-        let client = offlineClient([])
+    func testUnknownFlagReturnsDefaultWithReason() async throws {
+        let client = try offlineClient([])
         _ = await client.start(timeout: 1)
         let detail = client.boolVariationDetail("missing", default: true)
         XCTAssertTrue(detail.value)
@@ -38,8 +38,8 @@ final class FBClientEvaluationTests: XCTestCase {
         client.close()
     }
 
-    func testTypeMismatchReturnsDefault() async {
-        let client = offlineClient([
+    func testTypeMismatchReturnsDefault() async throws {
+        let client = try offlineClient([
             FeatureFlag(id: "str-flag", variation: "not-a-bool", variationType: "string", matchReason: "default"),
         ])
         _ = await client.start(timeout: 1)
@@ -49,17 +49,17 @@ final class FBClientEvaluationTests: XCTestCase {
         client.close()
     }
 
-    func testClientNotReadyReturnsDefault() {
+    func testClientNotReadyReturnsDefault() throws {
         // Online client (polling), never started, no bootstrap → "client not ready" without any network.
-        let options = FBOptions.Builder("secret").polling("https://eval.example.com").build()
+        let options = try FBOptions.Builder("secret").polling("https://eval.example.com").build()
         let client = DefaultFBClient(options: options, user: FBUser.builder("u1").build())
         let detail = client.boolVariationDetail("any", default: false)
         XCTAssertEqual(detail.reason, "client not ready")
         client.close()
     }
 
-    func testAllFlagsSnapshot() async {
-        let client = offlineClient([
+    func testAllFlagsSnapshot() async throws {
+        let client = try offlineClient([
             FeatureFlag(id: "a", variation: "1"),
             FeatureFlag(id: "b", variation: "2"),
         ])

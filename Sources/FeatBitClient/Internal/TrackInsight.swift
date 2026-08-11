@@ -21,7 +21,7 @@ final class HttpTrackInsight: FbApiClient, TrackInsight, @unchecked Sendable {
     private let endpoint: URL
 
     override init(options: FBOptions, session: URLSession? = nil) {
-        self.endpoint = URL(string: options.eventUri)!
+        self.endpoint = options.endpoints.event
             .appendingPathComponents(HttpConstants.insightTrackPath)
         super.init(options: options, session: session)
     }

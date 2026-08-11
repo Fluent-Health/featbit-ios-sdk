@@ -22,6 +22,8 @@ public final class FBOptions: @unchecked Sendable {
     public let backgroundGracePeriod: TimeInterval
     /// The logger used by the SDK.
     public let logger: FBLogger
+    /// Pre-parsed endpoints — single source of truth for URLs used at runtime.
+    let endpoints: FBEndpoints
 
     init(
         offline: Bool,
@@ -33,7 +35,8 @@ public final class FBOptions: @unchecked Sendable {
         streamingUri: String,
         eventUri: String,
         backgroundGracePeriod: TimeInterval,
-        logger: FBLogger
+        logger: FBLogger,
+        endpoints: FBEndpoints
     ) {
         self.offline = offline
         self.bootstrap = bootstrap
@@ -45,6 +48,7 @@ public final class FBOptions: @unchecked Sendable {
         self.eventUri = eventUri
         self.backgroundGracePeriod = backgroundGracePeriod
         self.logger = logger
+        self.endpoints = endpoints
     }
 
     /// Default URLs and intervals, matching the Android/Kotlin SDK.
@@ -128,8 +132,22 @@ public final class FBOptions: @unchecked Sendable {
             return self
         }
 
-        public func build() -> FBOptions {
-            FBOptions(
+        public func build() throws -> FBOptions {
+            if !offline && secret.trimmingCharacters(in: .whitespaces).isEmpty {
+                throw FBOptionsError.missingSecret
+            }
+            if pollingInterval <= 0 {
+                throw FBOptionsError.invalidPollingInterval(pollingInterval)
+            }
+            if backgroundGracePeriod < 0 {
+                throw FBOptionsError.invalidGracePeriod(backgroundGracePeriod)
+            }
+            let endpoints = try FBEndpoints.from(
+                pollingUri: pollingUri,
+                eventUri: eventUri,
+                streamingUri: streamingUri
+            )
+            return FBOptions(
                 offline: offline,
                 bootstrap: bootstrap,
                 secret: secret,
@@ -139,7 +157,8 @@ public final class FBOptions: @unchecked Sendable {
                 streamingUri: streamingUri,
                 eventUri: eventUri,
                 backgroundGracePeriod: backgroundGracePeriod,
-                logger: logger
+                logger: logger,
+                endpoints: endpoints
             )
         }
     }

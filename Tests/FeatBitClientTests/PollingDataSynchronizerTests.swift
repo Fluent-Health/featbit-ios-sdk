@@ -5,8 +5,8 @@ final class PollingDataSynchronizerTests: XCTestCase {
     override func setUp() { MockURLProtocol.reset() }
     override func tearDown() { MockURLProtocol.reset() }
 
-    private func makeSynchronizer(store: MemoryStore) -> PollingDataSynchronizer {
-        let options = FBOptions.Builder("secret")
+    private func makeSynchronizer(store: MemoryStore) throws -> PollingDataSynchronizer {
+        let options = try FBOptions.Builder("secret")
             .polling("https://eval.example.com", interval: 60)
             .build()
         let user = FBUser.builder("u1").build()
@@ -14,13 +14,13 @@ final class PollingDataSynchronizerTests: XCTestCase {
         return PollingDataSynchronizer(options: options, user: user, store: store, getUserFlags: getUserFlags)
     }
 
-    func testStartInitializesAndPopulatesStore() async {
+    func testStartInitializesAndPopulatesStore() async throws {
         MockURLProtocol.handler = { _ in
             let body = #"{"data":{"featureFlags":[{"id":"f1","variation":"true","matchReason":"default"}]}}"#
             return (200, Data(body.utf8))
         }
         let store = DefaultMemoryStore()
-        let sync = makeSynchronizer(store: store)
+        let sync = try makeSynchronizer(store: store)
 
         let ready = await sync.start()
 
@@ -30,10 +30,10 @@ final class PollingDataSynchronizerTests: XCTestCase {
         sync.close()
     }
 
-    func testFatalErrorFailsStart() async {
+    func testFatalErrorFailsStart() async throws {
         MockURLProtocol.handler = { _ in (401, Data()) }
         let store = DefaultMemoryStore()
-        let sync = makeSynchronizer(store: store)
+        let sync = try makeSynchronizer(store: store)
 
         let ready = await sync.start()
 

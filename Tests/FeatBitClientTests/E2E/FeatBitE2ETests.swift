@@ -39,7 +39,7 @@ final class FeatBitE2ETests: XCTestCase {
         let seed = try XCTUnwrap(Self.seed)
         let stack = try XCTUnwrap(Self.stack)
 
-        let options = FBOptions.Builder(seed.clientSecret)
+        let options = try FBOptions.Builder(seed.clientSecret)
             .polling(seed.evaluationBaseURL, interval: 1)
             .event(seed.evaluationBaseURL)
             .build()
