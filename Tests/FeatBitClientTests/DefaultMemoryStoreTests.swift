@@ -60,4 +60,94 @@ final class DefaultMemoryStoreTests: XCTestCase {
 
         XCTAssertTrue(listener.events.isEmpty)
     }
+
+    // MARK: Aggressive pinning (Task 10) — thread-safety + listener semantics.
+
+    func testConcurrentUpsertsAreRaceFree() {
+        // Mutation: removing the NSLock guard inside upsert would produce
+        // torn-write crashes or dictionary corruption under 16-thread hammering.
+        // Honest-scope: this catches "no crash + final state is one of the writers'".
+        // It does NOT catch a lock removal that only produces wrong-but-plausible
+        // final counts, because there's no invariant-count to check.
+        let store = DefaultMemoryStore()
+        let group = DispatchGroup()
+        for t in 0..<16 {
+            group.enter()
+            DispatchQueue.global().async {
+                for i in 0..<250 {
+                    store.upsert(FeatureFlag(id: "k", variation: "v-\(t)-\(i)"))
+                }
+                group.leave()
+            }
+        }
+        XCTAssertEqual(group.wait(timeout: .now() + 10), .success)
+        let final = store.get("k")
+        XCTAssertNotNil(final)
+        XCTAssertTrue(final!.variation.hasPrefix("v-"))
+    }
+
+    func testListenerObservesJustWrittenValue() {
+        // Mutation: notifying listener BEFORE `items[flag.id] = flag` would let the
+        // listener's re-read via store.get() return the OLD value. Test pins the
+        // happens-before between the items[] write and the listener callback.
+        let store = DefaultMemoryStore()
+        final class ReReader: FlagChangeListener {
+            let store: MemoryStore
+            var observed: [String] = []
+            init(_ s: MemoryStore) { store = s }
+            func onChange(_ event: FlagValueChangedEvent) {
+                observed.append(store.get(event.key)?.variation ?? "nil")
+            }
+        }
+        let listener = ReReader(store)
+        store.addChangeListener(listener)
+        store.upsert(FeatureFlag(id: "k", variation: "v1"))
+        store.upsert(FeatureFlag(id: "k", variation: "v2"))
+        XCTAssertEqual(listener.observed, ["v1", "v2"])
+    }
+
+    func testAddAndRemoveListenersDuringDispatchDoNotCorrupt() {
+        // Mutation: iterating `listeners` directly (not the compactMap snapshot at
+        // dispatch time) would either crash under Swift's exclusivity check or
+        // silently include the just-added listener in the current dispatch.
+        // Test asserts (a) no crash and (b) late-added listener does NOT fire for
+        // the in-flight event but DOES fire for subsequent events.
+        let store = DefaultMemoryStore()
+        final class Late: FlagChangeListener {
+            var fireCount = 0
+            func onChange(_ event: FlagValueChangedEvent) { fireCount += 1 }
+        }
+        let late = Late()
+        final class First: FlagChangeListener {
+            let store: MemoryStore
+            let late: Late
+            init(_ s: MemoryStore, _ l: Late) { store = s; late = l }
+            func onChange(_ event: FlagValueChangedEvent) {
+                store.addChangeListener(late)
+            }
+        }
+        let first = First(store, late)
+        store.addChangeListener(first)
+        store.upsert(FeatureFlag(id: "k", variation: "v1"))
+        XCTAssertEqual(late.fireCount, 0, "late-added listener must not fire for the in-flight event")
+        store.upsert(FeatureFlag(id: "k", variation: "v2"))
+        XCTAssertEqual(late.fireCount, 1, "late-added listener fires on subsequent events")
+    }
+
+    func testAddChangeListenerIsIdempotent() {
+        // Mutation: replacing the `removeAll` scan (line 58 in DefaultMemoryStore)
+        // with plain `append` would let the same listener fire N times per event
+        // after being added N times.
+        let store = DefaultMemoryStore()
+        final class Counter: FlagChangeListener {
+            var fireCount = 0
+            func onChange(_ event: FlagValueChangedEvent) { fireCount += 1 }
+        }
+        let l = Counter()
+        store.addChangeListener(l)
+        store.addChangeListener(l)  // re-add same instance
+        store.addChangeListener(l)  // and again
+        store.upsert(FeatureFlag(id: "k", variation: "v"))
+        XCTAssertEqual(l.fireCount, 1, "re-adding same listener must not multiply fires")
+    }
 }
