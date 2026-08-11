@@ -2,6 +2,9 @@ import XCTest
 @testable import FeatBitClient
 
 final class FBClientEvaluationTests: XCTestCase {
+    override func setUp() { MockURLProtocol.reset() }
+    override func tearDown() { MockURLProtocol.reset() }
+
     private func offlineClient(_ flags: [FeatureFlag]) throws -> DefaultFBClient {
         let options = try FBOptions.Builder()
             .offline(true)
@@ -84,5 +87,39 @@ final class FBClientEvaluationTests: XCTestCase {
         let start = Date()
         await client.closeAndJoin()
         XCTAssertLessThan(Date().timeIntervalSince(start), 0.5, "offline closeAndJoin should complete in under 500ms")
+    }
+
+    // MARK: Aggressive pinning (Task 16) — identify + close contract.
+    //
+    // Network-dependent tests (identify swap over polling, start-timeout under
+    // hung server, closeAndJoin bounded under blocked sync) require URLSession
+    // injection into DefaultFBClient — a knob the SDK does not yet expose. The
+    // MockURLProtocol test helper only intercepts URLSession instances explicitly
+    // configured with it; `URLProtocol.registerClass` does NOT affect ephemeral
+    // sessions that the SDK constructs internally, so tests using that path hang
+    // on real DNS. Deferred to a future task that adds a session-injection seam
+    // on DefaultFBClient. Two coverage points that DO work offline are captured
+    // here.
+
+    func testClosePreservesStoreAndBootstrapEvaluationsSurvive() async throws {
+        // Mutation: a close() that wiped the store would fail — bootstrap flags
+        // must remain queryable after teardown.
+        let flag = FeatureFlag(id: "f", variation: "v", matchReason: "default")
+        let client = try offlineClient([flag])
+        _ = await client.start(timeout: 1)
+        XCTAssertEqual(client.stringVariation("f", default: "x"), "v")
+        await client.closeAndJoin()
+        XCTAssertEqual(client.stringVariation("f", default: "x"), "v", "close must not wipe the store")
+    }
+
+    func testOfflineIdentifyReturnsTrueWithoutNetwork() async throws {
+        // Mutation: identify wiring up an online synchronizer in offline mode would
+        // hit real DNS and time out. NullDataSynchronizer.start returns true
+        // vacuously; identify must resolve true.
+        let client = try offlineClient([])
+        _ = await client.start(timeout: 1)
+        let ok = await client.identify(FBUser.builder("B").build(), timeout: 1)
+        XCTAssertTrue(ok, "offline identify must be true — Null synchronizer is vacuously ready")
+        await client.closeAndJoin()
     }
 }
