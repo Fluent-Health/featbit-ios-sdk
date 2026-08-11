@@ -68,4 +68,21 @@ final class FBClientEvaluationTests: XCTestCase {
         XCTAssertEqual(Set(all.keys), ["a", "b"])
         client.close()
     }
+
+    func testCloseAndJoinIsIdempotent() async throws {
+        let client = try offlineClient([])
+        _ = await client.start(timeout: 1)
+        await client.closeAndJoin()
+        let start = Date()
+        await client.closeAndJoin()
+        XCTAssertLessThan(Date().timeIntervalSince(start), 0.1, "second closeAndJoin should be near-instant")
+    }
+
+    func testCloseAndJoinCompletesPromptlyOffline() async throws {
+        let client = try offlineClient([])
+        _ = await client.start(timeout: 1)
+        let start = Date()
+        await client.closeAndJoin()
+        XCTAssertLessThan(Date().timeIntervalSince(start), 0.5, "offline closeAndJoin should complete in under 500ms")
+    }
 }

@@ -174,11 +174,39 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
         Task { await lifecycle.onNetworkChanged(available) }
     }
 
+    /// Fire-and-forget close. Returns immediately; teardown runs on a background Task.
+    /// Callers migrating from the .NET / Kotlin SDKs should be aware this no longer
+    /// blocks — use ``closeAndJoin()`` to await teardown.
     public func close() {
-        currentSynchronizer.close()
+        Task { [weak self] in await self?.closeAndJoin() }
+    }
+
+    /// Per-phase 2s + 2s budget:
+    ///
+    /// - Phase A: synchronizer teardown (2s budget).
+    /// - Phase B: insight dispatcher drain (2s budget).
+    /// - Non-blocking tail: flagTrackerImpl.close() + trackInsight.close().
+    ///
+    /// The budget bounds **caller latency**, not underlying work completion:
+    /// `sync.closeAndJoin()` awaits `Task<Void, Never>.value`, which does not honor
+    /// `Task.cancel()` from the outer withTimeout. If a poll is mid-flight in a
+    /// blocking URLSession round-trip that itself ignores cancellation, the caller
+    /// still returns within ~2s, but the poll may continue in the background until
+    /// its native timeout lands. This is acceptable for close because in-flight
+    /// upserts land in a store that is about to be released; the leaked Task
+    /// self-terminates when the poll returns. Regression pinned by Task 16
+    /// (`testCloseBoundedWhenSyncTeardownBlocks`).
+    public func closeAndJoin() async {
+        let sync = currentSynchronizer
+        _ = await withTimeout(seconds: 2.0) {
+            await sync.closeAndJoin()
+            return true
+        }
+        _ = await withTimeout(seconds: 2.0) { [insightDispatcher] in
+            await insightDispatcher.closeAndDrain()
+            return true
+        }
         flagTrackerImpl.close()
-        // Fire-and-forget the dispatcher drain; Task 8 tightens this into an async close().
-        Task { [insightDispatcher] in await insightDispatcher.closeAndDrain() }
         trackInsight.close()
     }
 }

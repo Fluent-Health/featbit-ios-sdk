@@ -42,6 +42,11 @@ public protocol FBClient: AnyObject {
 
     /// Releases the synchronizer, tracker, and insight resources.
     func close()
+
+    /// Suspending close. Awaits synchronizer teardown (2s budget) and insight flush
+    /// (2s budget). Use when the caller wants ordering guarantees (e.g. before the
+    /// process exits).
+    func closeAndJoin() async
 }
 
 // Convenience overloads with omitted arguments. These use distinct (fewer-parameter) signatures
@@ -65,4 +70,7 @@ public extension FBClient {
     func doubleVariationDetail(_ key: String) -> EvalDetail<Double> { doubleVariationDetail(key, default: 0) }
     func stringVariation(_ key: String) -> String { stringVariation(key, default: "") }
     func stringVariationDetail(_ key: String) -> EvalDetail<String> { stringVariationDetail(key, default: "") }
+
+    /// Default fallback: delegate to fire-and-forget `close()`.
+    func closeAndJoin() async { close() }
 }
