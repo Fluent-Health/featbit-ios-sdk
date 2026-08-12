@@ -39,10 +39,8 @@ final class InsightDispatcher: @unchecked Sendable {
     func start() {
         lock.lock(); defer { lock.unlock() }
         guard consumer == nil, !closed else { return }
-        let stream = self.stream
-        let tracker = self.tracker
-        consumer = Task {
-            await Self.consumeLoop(stream: stream, tracker: tracker)
+        consumer = Task { [weak self] in
+            await self?.consumeLoop()
         }
     }
 
@@ -69,45 +67,64 @@ final class InsightDispatcher: @unchecked Sendable {
         }
     }
 
-    /// Consumer loop. Batches up to `batchSize` items or `batchTimeoutNs` since the first
-    /// item in the batch, whichever comes first.
+    /// Consumer loop. Reads from the stream via `for await` (no captured-var mutation
+    /// hazard). Batches accumulate in a lock-guarded array with a size trigger; a
+    /// separate timer Task flushes the pending batch every `batchTimeoutNs` even when
+    /// no size trigger fires. Both size-triggered and timeout-triggered flushes go
+    /// through the same `flush(tracker:)` helper.
     ///
-    /// Uses a `withTaskGroup` race between `iterator.next()` and a sleep-to-deadline.
-    /// Trade-off: if the racing `next()` child pops an element and is then cancelled by
-    /// `group.cancelAll()` after we've already picked the sleep winner, that element is
-    /// dropped. This is acceptable — the bounded stream already tolerates drops, and the
-    /// invariant that matters ("batch is emitted eventually") holds because the outer
-    /// loop restarts on the next item.
-    private static func consumeLoop(stream: AsyncStream<Insight>, tracker: TrackInsight) async {
-        var iterator = stream.makeAsyncIterator()
-        while true {
-            // Block for the first item of the next batch.
-            guard let first = await iterator.next() else { break }
-            var batch: [Insight] = [first]
-            batch.reserveCapacity(batchSize)
+    /// Design rationale: an earlier version raced `iterator.next()` against a sleep in
+    /// a `withTaskGroup`, but capturing the iterator in an `@Sendable` closure trips
+    /// Swift's strict-concurrency check ("mutation of captured var 'iterator' in
+    /// concurrently-executing code"). The current design keeps the iterator on a
+    /// single task and uses shared mutable state (lock-guarded pending array) as the
+    /// synchronization point between the reader and the timer.
+    private func consumeLoop() async {
+        let stream = self.stream
+        let tracker = self.tracker
 
-            // Drain up to (batchSize - 1) more within the batchTimeout window.
-            let deadline = DispatchTime.now().uptimeNanoseconds &+ batchTimeoutNs
-            while batch.count < batchSize {
-                let now = DispatchTime.now().uptimeNanoseconds
-                if now >= deadline { break }
-                let remainingNs = deadline &- now
-                // Race one iterator.next() against a sleep to the deadline.
-                let winner: Insight? = await withTaskGroup(of: Insight?.self) { group in
-                    group.addTask { await iterator.next() }
-                    group.addTask {
-                        try? await Task.sleep(nanoseconds: remainingNs)
-                        return nil
-                    }
-                    let w = await group.next() ?? nil
-                    group.cancelAll()
-                    return w ?? nil
-                }
-                guard let next = winner else { break }
-                batch.append(next)
+        // Start the timer task. It runs alongside the for-await loop and flushes the
+        // pending batch every batchTimeoutNs. Cancelled when the stream finishes.
+        let timer = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: Self.batchTimeoutNs)
+                if Task.isCancelled { break }
+                await self.flush(tracker: tracker)
             }
-
-            await tracker.runBatch(batch)
         }
+
+        for await insight in stream {
+            let shouldFlush: Bool = self.pendingLock.withLock {
+                self.pending.append(insight)
+                return self.pending.count >= Self.batchSize
+            }
+            if shouldFlush {
+                await flush(tracker: tracker)
+            }
+        }
+
+        // Stream finished. Cancel the timer and flush any remaining items.
+        timer.cancel()
+        await flush(tracker: tracker)
+    }
+
+    private let pendingLock = NSLock()
+    private var pending: [Insight] = []
+
+    private func flush(tracker: TrackInsight) async {
+        let batch: [Insight] = pendingLock.withLock {
+            let b = pending
+            pending.removeAll(keepingCapacity: true)
+            return b
+        }
+        if batch.isEmpty { return }
+        await tracker.runBatch(batch)
+    }
+}
+
+private extension NSLock {
+    func withLock<T>(_ body: () throws -> T) rethrows -> T {
+        lock(); defer { unlock() }
+        return try body()
     }
 }
