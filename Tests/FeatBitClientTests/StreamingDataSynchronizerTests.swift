@@ -155,10 +155,15 @@ final class StreamingDataSynchronizerLoopbackTests: XCTestCase {
         XCTAssertEqual(started, true, "sync must initialize before we can pause it")
 
         sync.pause()
-        // Give the close frame time to reach the server's receive loop.
-        try await Task.sleep(nanoseconds: 300_000_000)
-
-        let close = server.recordedClose()
+        // Poll for the close frame — CI runners can take up to ~1s to deliver the
+        // WS close frame through NWListener under load. Bounded poll instead of a
+        // fixed sleep so a fast run doesn't waste budget.
+        var close: (code: Int?, reason: String?) = (nil, nil)
+        for _ in 0..<40 {
+            try await Task.sleep(nanoseconds: 50_000_000)
+            close = server.recordedClose()
+            if close.code != nil { break }
+        }
         XCTAssertEqual(close.code, 1000, "pause must close the WS with normal-closure (1000)")
         XCTAssertEqual(close.reason, "paused", "pause must send reason=\"paused\" on the close frame")
 

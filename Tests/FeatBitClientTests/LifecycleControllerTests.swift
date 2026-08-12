@@ -4,7 +4,10 @@ import XCTest
 /// Port of the Android `LifecycleControllerTest`. Uses a short real grace period rather than virtual
 /// time (no Clock dependency), with generous waits so the assertions are timing-robust.
 final class LifecycleControllerTests: XCTestCase {
-    private let grace: TimeInterval = 0.05
+    // Grace is generous (150ms) so CI runners under load still meet the timing
+    // budgets. `sleepPastGrace()` waits 3x this — 450ms — which is comfortably
+    // longer than macOS-CI Task.sleep jitter (~50-150ms on shared runners).
+    private let grace: TimeInterval = 0.15
 
     private final class MockSynchronizer: DataSynchronizer, @unchecked Sendable {
         let initialized = true

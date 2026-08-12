@@ -107,10 +107,13 @@ final class PollingDataSynchronizerTests: XCTestCase {
         let store = DefaultMemoryStore()
         let sync = try makeFastSynchronizer(store: store, interval: 0.05)
         let started = Task { await sync.start() }
-        try await Task.sleep(nanoseconds: 200_000_000) // ~4 polling intervals
+        // 500ms window at 50ms interval — CI runners under load see Task.sleep
+        // jitter of ~50-150ms, so 200ms was too tight. 500ms comfortably covers
+        // ≥3 polls even on slow shared runners.
+        try await Task.sleep(nanoseconds: 500_000_000)
         await sync.closeAndJoin()
         _ = await started.value
-        XCTAssertGreaterThanOrEqual(MockURLProtocol.requests.count, 3, "polling loop should issue ≥3 requests within 200ms at 50ms interval")
+        XCTAssertGreaterThanOrEqual(MockURLProtocol.requests.count, 3, "polling loop should issue ≥3 requests within 500ms at 50ms interval")
     }
 
     func testTransient500DoesNotStopLoopAndNext200Initializes() async throws {
