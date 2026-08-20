@@ -2,6 +2,7 @@ apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: featbit-ios-sdk
+  title: FeatBit iOS SDK
   description: FeatBit client-side feature-flag SDK for Swift/iOS (based on FeatBit's .NET + React Native client SDKs)
   annotations:
     github.com/project-slug: Fluent-Health/featbit-ios-sdk
