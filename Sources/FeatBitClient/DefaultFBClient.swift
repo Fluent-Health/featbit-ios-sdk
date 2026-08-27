@@ -9,6 +9,8 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
     private let evaluator: Evaluator
     private let flagTrackerImpl: FlagTrackerImpl
     private let trackInsight: TrackInsight
+    private let insightsEnabled: Bool
+    private let insightDispatcher: InsightDispatcher
 
     private let lock = Lock()
     private var user: FBUser
@@ -26,6 +28,9 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
         self.evaluator = Evaluator(store: store)
         self.flagTrackerImpl = FlagTrackerImpl(store: store)
         self.trackInsight = options.offline ? NoopTrackInsight() : HttpTrackInsight(options: options)
+        self.insightsEnabled = !(self.trackInsight is NoopTrackInsight)
+        self.insightDispatcher = InsightDispatcher(tracker: self.trackInsight, logger: options.logger)
+        self.insightDispatcher.start()
         self.user = user
         self.dataSynchronizer = DefaultFBClient.newDataSynchronizer(options: options, user: user, store: store)
         self.lifecycle = LifecycleController(graceSeconds: options.backgroundGracePeriod) { [weak self] in
@@ -75,7 +80,7 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
             return (old, fresh)
         }
 
-        old.close()
+        await old.closeAndJoin()
 
         let success = await withTimeout(seconds: timeout) {
             await fresh.start()
@@ -91,7 +96,7 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
     // MARK: Evaluation
 
     public func boolVariation(_ key: String, default defaultValue: Bool) -> Bool {
-        evaluateCore(key, defaultValue, ValueConverters.bool).value
+        evaluateValue(key, defaultValue, ValueConverters.bool)
     }
 
     public func boolVariationDetail(_ key: String, default defaultValue: Bool) -> EvalDetail<Bool> {
@@ -99,7 +104,7 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
     }
 
     public func intVariation(_ key: String, default defaultValue: Int) -> Int {
-        evaluateCore(key, defaultValue, ValueConverters.int).value
+        evaluateValue(key, defaultValue, ValueConverters.int)
     }
 
     public func intVariationDetail(_ key: String, default defaultValue: Int) -> EvalDetail<Int> {
@@ -107,7 +112,7 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
     }
 
     public func floatVariation(_ key: String, default defaultValue: Float) -> Float {
-        evaluateCore(key, defaultValue, ValueConverters.float).value
+        evaluateValue(key, defaultValue, ValueConverters.float)
     }
 
     public func floatVariationDetail(_ key: String, default defaultValue: Float) -> EvalDetail<Float> {
@@ -115,7 +120,7 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
     }
 
     public func doubleVariation(_ key: String, default defaultValue: Double) -> Double {
-        evaluateCore(key, defaultValue, ValueConverters.double).value
+        evaluateValue(key, defaultValue, ValueConverters.double)
     }
 
     public func doubleVariationDetail(_ key: String, default defaultValue: Double) -> EvalDetail<Double> {
@@ -123,7 +128,7 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
     }
 
     public func stringVariation(_ key: String, default defaultValue: String) -> String {
-        evaluateCore(key, defaultValue, ValueConverters.string).value
+        evaluateValue(key, defaultValue, ValueConverters.string)
     }
 
     public func stringVariationDetail(_ key: String, default defaultValue: String) -> EvalDetail<String> {
@@ -131,7 +136,35 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
     }
 
     public func allFlags() -> [String: FeatureFlag] {
-        Dictionary(store.getAll().map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        let snapshot = store.getAll()
+        var out: [String: FeatureFlag] = [:]
+        out.reserveCapacity(snapshot.count)
+        for flag in snapshot { out[flag.id] = flag }
+        return out
+    }
+
+    /// Alloc-free variation hot path — mirrors ``evaluateCore`` but skips the
+    /// ``EvalDetail`` allocation because plain-value callers don't need a reason
+    /// string. ``*VariationDetail`` callers stay on ``evaluateCore``.
+    private func evaluateValue<T: Sendable>(_ key: String, _ defaultValue: T, _ converter: ValueConverter<T>) -> T {
+        // Client not ready and no bootstrap data — always return the default value.
+        if !initialized && options.bootstrap.isEmpty {
+            return defaultValue
+        }
+
+        guard let flag = evaluator.evaluateValue(key) else {
+            return defaultValue
+        }
+
+        // Fast-path insight emission — short-circuit when tracker is Noop so
+        // offline mode allocates no Insight / EndUser graph per evaluation.
+        if insightsEnabled {
+            let currentUser = currentUserSnapshot()
+            let ts = Int64(Date().timeIntervalSince1970 * 1000)
+            insightDispatcher.offer(Insight.forEvaluation(user: currentUser, flag: flag, timestamp: ts))
+        }
+
+        return converter(flag.variation) ?? defaultValue
     }
 
     private func evaluateCore<T: Sendable>(_ key: String, _ defaultValue: T, _ converter: ValueConverter<T>) -> EvalDetail<T> {
@@ -140,18 +173,21 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
             return EvalDetail(reason: "client not ready", value: defaultValue)
         }
 
-        let (evalResult, flag) = evaluator.evaluate(key)
-        guard evalResult.isValid, let flag else {
+        let evalResult = evaluator.evaluate(key)
+        guard case .found(let flag) = evalResult else {
             return EvalDetail(reason: evalResult.reason, value: defaultValue)
         }
 
-        // Fire-and-forget the evaluation insight.
-        let currentUser = currentUserSnapshot()
-        let ts = Int64(Date().timeIntervalSince1970 * 1000)
-        Task { [weak self] in await self?.trackInsight.run(Insight.forEvaluation(user: currentUser, flag: flag, timestamp: ts)) }
+        // Non-suspending emit onto the bounded batching pipeline. Skipped when
+        // the underlying tracker is Noop (offline mode).
+        if insightsEnabled {
+            let currentUser = currentUserSnapshot()
+            let ts = Int64(Date().timeIntervalSince1970 * 1000)
+            insightDispatcher.offer(Insight.forEvaluation(user: currentUser, flag: flag, timestamp: ts))
+        }
 
-        if let typed = converter(evalResult.value) {
-            return EvalDetail(reason: evalResult.reason, value: typed)
+        if let typed = converter(flag.variation) {
+            return EvalDetail(reason: flag.matchReason, value: typed)
         } else {
             return EvalDetail(reason: "type mismatch", value: defaultValue)
         }
@@ -171,23 +207,42 @@ public final class DefaultFBClient: FBClient, @unchecked Sendable {
         Task { await lifecycle.onNetworkChanged(available) }
     }
 
+    /// Fire-and-forget close. Returns immediately; teardown runs on a background Task.
+    /// Callers migrating from the .NET / Kotlin SDKs should be aware this no longer
+    /// blocks — use ``closeAndJoin()`` to await teardown.
+    ///
+    /// A closed `DefaultFBClient` is single-use: subsequent `start()` / `identify()`
+    /// calls will not resurrect the pipeline. Construct a fresh client to reconnect.
     public func close() {
-        currentSynchronizer.close()
+        Task { [weak self] in await self?.closeAndJoin() }
+    }
+
+    /// Per-phase 2s + 2s budget:
+    ///
+    /// - Phase A: synchronizer teardown (2s budget).
+    /// - Phase B: insight dispatcher drain (2s budget).
+    /// - Non-blocking tail: flagTrackerImpl.close() + trackInsight.close().
+    ///
+    /// The budget bounds **caller latency**, not underlying work completion:
+    /// `sync.closeAndJoin()` awaits `Task<Void, Never>.value`, which does not honor
+    /// `Task.cancel()` from the outer withTimeout. If a poll is mid-flight in a
+    /// blocking URLSession round-trip that itself ignores cancellation, the caller
+    /// still returns within ~2s, but the poll may continue in the background until
+    /// its native timeout lands. This is acceptable for close because in-flight
+    /// upserts land in a store that is about to be released; the leaked Task
+    /// self-terminates when the poll returns. Regression pinned by Task 16
+    /// (`testCloseBoundedWhenSyncTeardownBlocks`).
+    public func closeAndJoin() async {
+        let sync = currentSynchronizer
+        _ = await withTimeout(seconds: 2.0) {
+            await sync.closeAndJoin()
+            return true
+        }
+        _ = await withTimeout(seconds: 2.0) { [insightDispatcher] in
+            await insightDispatcher.closeAndDrain()
+            return true
+        }
         flagTrackerImpl.close()
         trackInsight.close()
-    }
-}
-
-/// Runs `operation`, returning its result, or `false` if it does not complete within `seconds`.
-private func withTimeout(seconds: TimeInterval, _ operation: @escaping @Sendable () async -> Bool) async -> Bool {
-    await withTaskGroup(of: Bool.self) { group in
-        group.addTask { await operation() }
-        group.addTask {
-            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-            return false
-        }
-        let result = await group.next() ?? false
-        group.cancelAll()
-        return result
     }
 }

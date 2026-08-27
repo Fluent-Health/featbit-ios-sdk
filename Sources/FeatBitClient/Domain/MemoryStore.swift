@@ -8,6 +8,16 @@ protocol MemoryStore: AnyObject, Sendable {
     func get(_ id: String) -> FeatureFlag?
     func getAll() -> [FeatureFlag]
     func upsert(_ flag: FeatureFlag)
+    func upsertAll(_ flags: [FeatureFlag])
     func addChangeListener(_ listener: FlagChangeListener)
     func removeChangeListener(_ listener: FlagChangeListener)
+}
+
+extension MemoryStore {
+    /// Default: iterate and dispatch to `upsert(_:)`. Overrides on concrete
+    /// impls can lock-once + notify-after-lock for lower contention. Consumers
+    /// must not depend on which ordering they see — both are valid.
+    func upsertAll(_ flags: [FeatureFlag]) {
+        for flag in flags { upsert(flag) }
+    }
 }

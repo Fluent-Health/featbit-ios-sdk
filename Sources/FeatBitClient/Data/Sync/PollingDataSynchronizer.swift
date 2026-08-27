@@ -65,7 +65,7 @@ final class PollingDataSynchronizer: DataSynchronizer, @unchecked Sendable {
         lock.withLock { timestamp = Int64(Date().timeIntervalSince1970 * 1000) }
         logger.debug { "Polling received \(response.flags.count) flags." }
 
-        for flag in response.flags { store.upsert(flag) }
+        store.upsertAll(response.flags)
 
         let wasInitialized = lock.withLock { () -> Bool in
             let was = _initialized
@@ -90,6 +90,21 @@ final class PollingDataSynchronizer: DataSynchronizer, @unchecked Sendable {
         }
         guard shouldComplete else { return }
         task?.cancel()
+        startGate.complete(false)
+    }
+
+    func closeAndJoin() async {
+        var task: Task<Void, Never>?
+        let shouldComplete: Bool = lock.withLock {
+            if closed { return false }
+            closed = true
+            task = loopTask
+            loopTask = nil
+            return true
+        }
+        guard shouldComplete else { return }
+        task?.cancel()
+        if let task { _ = await task.value }
         startGate.complete(false)
     }
 }

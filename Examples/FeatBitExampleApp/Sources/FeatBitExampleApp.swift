@@ -17,10 +17,15 @@ struct FeatBitExampleApp: App {
     init() {
         // TODO: replace with your environment secret + evaluation-server URLs.
         let secret = "<replace-with-your-env-secret>"
-        let options = FBOptions.Builder(secret)
-            .streaming("wss://app-eval.featbit.co")
-            .event("https://app-eval.featbit.co")
-            .build()
+        let options: FBOptions
+        do {
+            options = try FBOptions.Builder(secret)
+                .streaming("wss://app-eval.featbit.co")
+                .event("https://app-eval.featbit.co")
+                .build()
+        } catch {
+            fatalError("FeatBit init failed: \(error)")
+        }
 
         let user = FBUser.builder("example-user").name("Example").custom("platform", "ios").build()
         let client = DefaultFBClient(options: options, user: user)

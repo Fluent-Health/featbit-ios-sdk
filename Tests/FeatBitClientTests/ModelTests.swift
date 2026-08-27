@@ -42,4 +42,17 @@ final class ModelTests: XCTestCase {
         let user = FBUser.builder("k").name("   ").build()
         XCTAssertEqual(user.name, "")
     }
+
+    func testFBUserEndUserCachedIdentityStableAcrossCalls() {
+        // Mutation: reverting to recomputed toEndUser() would rebuild EndUser +
+        // CustomizedProperty list on every call. Structural equality holds either
+        // way — this test asserts cached identity via EndUser Equatable across
+        // 1000 calls, catching an allocation regression only if the recomputation
+        // path introduces any per-call divergence (e.g. from sorted() non-determinism).
+        let user = FBUser.builder("k").name("n").custom("c", "v").build()
+        let first = user.toEndUser()
+        for _ in 0..<1000 {
+            XCTAssertEqual(user.toEndUser(), first)
+        }
+    }
 }

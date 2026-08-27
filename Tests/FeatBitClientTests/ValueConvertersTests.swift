@@ -26,4 +26,35 @@ final class ValueConvertersTests: XCTestCase {
     func testString() {
         XCTAssertEqual(ValueConverters.string("  keep spaces  "), "  keep spaces  ")
     }
+
+    // MARK: Aggressive pinning (Task 27) — alloc-free bool.
+
+    func testBoolAcceptsMixedCase() {
+        // Mutation: replacing compare(_:options:.caseInsensitive) with plain
+        // == "true" would reject mixed-case inputs.
+        XCTAssertEqual(ValueConverters.bool("TRUE"), true)
+        XCTAssertEqual(ValueConverters.bool("True"), true)
+        XCTAssertEqual(ValueConverters.bool("tRuE"), true)
+        XCTAssertEqual(ValueConverters.bool("false"), false)
+        XCTAssertEqual(ValueConverters.bool("FALSE"), false)
+        XCTAssertEqual(ValueConverters.bool("fAlSe"), false)
+    }
+
+    func testBoolTrimsWhitespace() {
+        XCTAssertEqual(ValueConverters.bool("  true  "), true)
+        XCTAssertEqual(ValueConverters.bool("\ttrue\t"), true)
+        XCTAssertEqual(ValueConverters.bool(" false "), false)
+    }
+
+    func testBoolRejectsNearMatches() {
+        // Mutation: hasPrefix("true") would accept "trues"; startsWith would
+        // accept "trueX". compare(_:options:.caseInsensitive) tests full-string
+        // equivalence, so all near-matches must be rejected.
+        XCTAssertNil(ValueConverters.bool("trues"))
+        XCTAssertNil(ValueConverters.bool("trueX"))
+        XCTAssertNil(ValueConverters.bool("yes"))
+        XCTAssertNil(ValueConverters.bool("1"))
+        XCTAssertNil(ValueConverters.bool("0"))
+        XCTAssertNil(ValueConverters.bool(""))
+    }
 }

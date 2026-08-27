@@ -17,10 +17,18 @@ protocol DataSynchronizer: AnyObject, Sendable {
     /// repeatedly. Default: no-op.
     func resume()
 
+    /// Fire-and-forget close. Cancels work and returns immediately.
     func close()
+
+    /// Suspending close: cancels work AND awaits in-flight upserts / send-completion. Callers
+    /// use this from `identify` and `close` phases to prevent old-user data landing after
+    /// switch or leaking teardown threads.
+    func closeAndJoin() async
 }
 
 extension DataSynchronizer {
     func pause() {}
     func resume() {}
+    /// Default fallback: fire close and return. Overridden by synchronizers that own a Task.
+    func closeAndJoin() async { close() }
 }

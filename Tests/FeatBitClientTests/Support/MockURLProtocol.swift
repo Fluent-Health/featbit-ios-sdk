@@ -5,7 +5,21 @@ import FoundationNetworking
 #endif
 
 /// A `URLProtocol` stub for unit-testing networking without a real server (the Swift analogue of
-/// OkHttp's `MockWebServer`). Install it via a `URLSessionConfiguration` and set ``handler``.
+/// OkHttp's `MockWebServer`).
+///
+/// Two APIs coexist:
+///
+/// 1. **Handler API** (pre-existing). Set ``handler`` to a closure that returns
+///    `(statusCode, body)` for each request. Used by tests written before the
+///    FIFO-stub migration.
+///
+/// 2. **FIFO stub queue API** (added for the hardening pass). Call
+///    ``enqueue(status:headers:body:)`` (or the JSON variant) once per expected
+///    request; requests pop stubs in FIFO order. Tests that need structural
+///    assertions on the request body read from ``receivedRequests``. Reset with
+///    ``reset()`` between tests.
+///
+/// If both are configured the handler wins. Prefer the FIFO API for new tests.
 final class MockURLProtocol: URLProtocol {
     /// Returns `(statusCode, body)` for a given request. Set before issuing requests.
     nonisolated(unsafe) static var handler: ((URLRequest) -> (Int, Data))?
@@ -14,10 +28,42 @@ final class MockURLProtocol: URLProtocol {
     /// Captures request bodies (URLProtocol strips `httpBody` for stream uploads).
     nonisolated(unsafe) static var bodies: [Data] = []
 
+    // MARK: FIFO stub queue
+
+    struct StubResponse {
+        let statusCode: Int
+        let headers: [String: String]
+        let body: Data
+    }
+
+    private static let queueLock = NSLock()
+    nonisolated(unsafe) private static var stubs: [StubResponse] = []
+    nonisolated(unsafe) private static var _receivedRequests: [URLRequest] = []
+
+    /// FIFO-recorded requests (populated by both the handler and the stub-queue paths so
+    /// callers can assert on requests regardless of which API produced the response).
+    static var receivedRequests: [URLRequest] {
+        queueLock.lock(); defer { queueLock.unlock() }
+        return _receivedRequests
+    }
+
+    static func enqueue(status: Int, headers: [String: String] = [:], body: Data = Data()) {
+        queueLock.lock(); defer { queueLock.unlock() }
+        stubs.append(StubResponse(statusCode: status, headers: headers, body: body))
+    }
+
+    static func enqueue(status: Int, jsonBody: String) {
+        enqueue(status: status, headers: ["Content-Type": "application/json"], body: Data(jsonBody.utf8))
+    }
+
     static func reset() {
         handler = nil
         requests = []
         bodies = []
+        queueLock.lock()
+        stubs.removeAll()
+        _receivedRequests.removeAll()
+        queueLock.unlock()
     }
 
     /// Builds a `URLSession` wired to this stub.
@@ -32,13 +78,30 @@ final class MockURLProtocol: URLProtocol {
 
     override func startLoading() {
         MockURLProtocol.requests.append(request)
+        var recorded = request
         if let body = request.httpBody {
             MockURLProtocol.bodies.append(body)
+            recorded.httpBody = body
         } else if let stream = request.httpBodyStream {
-            MockURLProtocol.bodies.append(MockURLProtocol.readStream(stream))
+            let body = MockURLProtocol.readStream(stream)
+            MockURLProtocol.bodies.append(body)
+            recorded.httpBody = body
         }
+        MockURLProtocol.queueLock.lock()
+        MockURLProtocol._receivedRequests.append(recorded)
+        MockURLProtocol.queueLock.unlock()
 
-        let (status, data) = MockURLProtocol.handler?(request) ?? (200, Data())
+        let (status, data): (Int, Data)
+        if let handler = MockURLProtocol.handler {
+            (status, data) = handler(request)
+        } else {
+            let stub: StubResponse? = MockURLProtocol.queueLock.withLock {
+                MockURLProtocol.stubs.isEmpty ? nil : MockURLProtocol.stubs.removeFirst()
+            }
+            let s = stub ?? StubResponse(statusCode: 200, headers: [:], body: Data())
+            status = s.statusCode
+            data = s.body
+        }
         let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: nil)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: data)
@@ -60,5 +123,12 @@ final class MockURLProtocol: URLProtocol {
             data.append(buffer, count: read)
         }
         return data
+    }
+}
+
+private extension NSLock {
+    func withLock<T>(_ body: () throws -> T) rethrows -> T {
+        lock(); defer { unlock() }
+        return try body()
     }
 }

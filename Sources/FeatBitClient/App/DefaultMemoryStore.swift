@@ -53,6 +53,28 @@ final class DefaultMemoryStore: MemoryStore, @unchecked Sendable {
         }
     }
 
+    func upsertAll(_ flags: [FeatureFlag]) {
+        if flags.isEmpty { return }
+        lock.lock()
+        var events: [FlagValueChangedEvent] = []
+        events.reserveCapacity(flags.count)
+        for flag in flags {
+            let existing = items[flag.id]
+            if existing == nil {
+                events.append(FlagValueChangedEvent(key: flag.id, oldValue: nil, newValue: flag.variation))
+            } else if existing!.variation != flag.variation {
+                events.append(FlagValueChangedEvent(key: flag.id, oldValue: existing!.variation, newValue: flag.variation))
+            }
+            items[flag.id] = flag
+        }
+        let snapshot = listeners.compactMap { $0.value }
+        lock.unlock()
+
+        for event in events {
+            for listener in snapshot { listener.onChange(event) }
+        }
+    }
+
     func addChangeListener(_ listener: FlagChangeListener) {
         lock.lock(); defer { lock.unlock() }
         listeners.removeAll { $0.value == nil || $0.value === listener }

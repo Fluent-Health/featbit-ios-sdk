@@ -19,14 +19,17 @@ public struct FBUser: Equatable, Sendable {
     public let name: String
     public let custom: [String: String]
 
+    /// Precomputed wire form. FBUser is immutable, so we build the ``EndUser``
+    /// (and its sorted `CustomizedProperty` list) once at construction and hand
+    /// out the same value on every call. Skips per-eval sort + allocation on
+    /// the hot path.
+    let endUser: EndUser
+
     init(key: String, name: String, custom: [String: String]) {
         self.key = key
         self.name = name
         self.custom = custom
-    }
-
-    func toEndUser() -> EndUser {
-        EndUser(
+        self.endUser = EndUser(
             keyId: key,
             name: name,
             // Sort for deterministic payloads (Kotlin used a LinkedHashMap insertion order;
@@ -36,6 +39,8 @@ public struct FBUser: Equatable, Sendable {
                 .map { CustomizedProperty(name: $0.key, value: $0.value) }
         )
     }
+
+    func toEndUser() -> EndUser { endUser }
 
     /// Fluent builder for ``FBUser``.
     public final class Builder {

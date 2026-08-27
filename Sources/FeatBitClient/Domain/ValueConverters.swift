@@ -6,11 +6,13 @@ typealias ValueConverter<T> = (String) -> T?
 /// String → typed-value converters, matching the Kotlin `ValueConverters`.
 enum ValueConverters {
     static let bool: ValueConverter<Bool> = { value in
-        switch value.trimmingCharacters(in: .whitespaces).lowercased() {
-        case "true": return true
-        case "false": return false
-        default: return nil
-        }
+        let trimmed = value.trimmingCharacters(in: .whitespaces)
+        // Alloc-free case-insensitive compare — .lowercased() allocates a fresh
+        // String whenever any character has an uppercase counterpart; compare(_:options:)
+        // handles the case fold in-place.
+        if trimmed.compare("true", options: .caseInsensitive) == .orderedSame { return true }
+        if trimmed.compare("false", options: .caseInsensitive) == .orderedSame { return false }
+        return nil
     }
 
     static let string: ValueConverter<String> = { $0 }
